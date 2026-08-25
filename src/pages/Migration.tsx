@@ -119,7 +119,7 @@ export default function Migration() {
         // 1a) Parse workbook
         const filename = reportName.replace(/\.twbx$/i, "");
         const parseRes = await fetch(
-          `https://frame-tomgenerator-test-hqf5dvhjbgd0hqht.eastus-01.azurewebsites.net/parse/${encodeURIComponent(filename)}`,
+          `https://tomgenratorupdatedapp-akh9c9a4cxg3czgv.eastus-01.azurewebsites.net/parse/${encodeURIComponent(filename)}`,
           { method: "POST", headers: { accept: "application/json" } },
         );
         if (!parseRes.ok) throw new Error(`Parse failed (${parseRes.status})`);
