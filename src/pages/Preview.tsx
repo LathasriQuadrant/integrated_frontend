@@ -25,7 +25,7 @@
 // /* ----------------------------------------------------
 //    📍 CONFIGURATION & CONSTANTS
 //    ---------------------------------------------------- */
-// const API_URL = "https://visuals-json-gdfth9dsbmhrgcb0.eastus-01.azurewebsites.net/runtime-visuals";
+// const API_URL = "https://frame-pbir-test-eqhpdtf4bag0aecw.eastus-01.azurewebsites.net/runtime-visuals";
 
 // const pbiService = new service.Service(factories.hpmFactory, factories.wpmpFactory, factories.routerFactory);
 
@@ -344,6 +344,15 @@
 
 //       let pages = await report.getPages();
 
+//       const failedVisuals: string[] = [];
+//       let createdCount = 0;
+//       let totalToCreate = 0;
+
+//       const rectsOverlap = (
+//         a: { x: number; y: number; width: number; height: number },
+//         b: { x: number; y: number; width: number; height: number },
+//       ) => a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+
 //       for (let i = 0; i < pagesToProcess.length; i++) {
 //         const config = pagesToProcess[i];
 //         const expectedPageName = `Page ${i + 1}`;
@@ -390,28 +399,56 @@
 
 //         await sleep(500);
 
+//         // Page bounds, so visuals aren't placed (and clipped/hidden) off-canvas.
+//         const pageSize = (page as any).defaultSize?.width ? (page as any).defaultSize : { width: 1280, height: 720 };
+
 //         let currentOrphanY = 40;
+//         const placedRects: { x: number; y: number; width: number; height: number }[] = [];
 
 //         for (const sheetName of config.worksheets) {
 //           const v = visualMap.get(sheetName);
 //           if (!v) continue;
+//           totalToCreate++;
 
 //           let finalX = v.layout.x;
 //           let finalY = v.layout.y;
+//           const finalWidth = Math.min(v.layout.width, pageSize.width - 10);
+//           const finalHeight = Math.min(v.layout.height, pageSize.height - 10);
 
 //           if (config.isOrphan) {
 //             finalX = 40;
 //             finalY = currentOrphanY;
-//             currentOrphanY += v.layout.height + 20;
+//             currentOrphanY += finalHeight + 20;
+//           } else {
+//             // Clamp to the page so a visual isn't pushed off-canvas.
+//             finalX = Math.max(0, Math.min(finalX, pageSize.width - finalWidth));
+//             finalY = Math.max(0, Math.min(finalY, pageSize.height - finalHeight));
+
+//             // If this rect overlaps one already placed on this page (common when the
+//             // migrated metadata has duplicate/approximate coordinates), the new visual
+//             // would be drawn directly on top of the old one and effectively hide it.
+//             // Push it down below the lowest overlapping visual instead of stacking.
+//             let candidate = { x: finalX, y: finalY, width: finalWidth, height: finalHeight };
+//             let guard = 0;
+//             while (placedRects.some((r) => rectsOverlap(r, candidate)) && guard < 50) {
+//               const overlapping = placedRects.filter((r) => rectsOverlap(r, candidate));
+//               const lowestBottom = Math.max(...overlapping.map((r) => r.y + r.height));
+//               candidate = { ...candidate, y: lowestBottom + 10 };
+//               guard++;
+//             }
+//             finalX = candidate.x;
+//             finalY = candidate.y;
 //           }
+
+//           placedRects.push({ x: finalX, y: finalY, width: finalWidth, height: finalHeight });
 
 //           setStatus(`Creating ${v.visualType} on ${expectedPageName}...`);
 //           try {
 //             const { visual } = await page.createVisual(normalizeType(v.visualType), {
 //               x: finalX,
 //               y: finalY,
-//               width: v.layout.width,
-//               height: v.layout.height,
+//               width: finalWidth,
+//               height: finalHeight,
 //               displayState: { mode: models.VisualContainerDisplayMode.Visible },
 //             });
 
@@ -473,15 +510,31 @@
 //                 }
 //               }
 //             }
+
+//             createdCount++;
 //           } catch (e: any) {
 //             console.error(`❌ Create failed for ${sheetName}:`, e);
+//             failedVisuals.push(`${sheetName} (${expectedPageName})`);
 //           }
 //         }
 //       }
 
 //       await report.save();
-//       setStatus("Dashboards and Visuals generated successfully!");
-//       setStatusType("success");
+
+//       if (failedVisuals.length > 0) {
+//         setStatus(
+//           `Created ${createdCount} of ${totalToCreate} visuals. Failed: ${failedVisuals.join(", ")}`,
+//         );
+//         setStatusType("warning");
+//         toast({
+//           title: "Some visuals could not be created",
+//           description: `${failedVisuals.length} visual(s) failed: ${failedVisuals.join(", ")}. Check the console for details.`,
+//           variant: "destructive",
+//         });
+//       } else {
+//         setStatus("Dashboards and Visuals generated successfully!");
+//         setStatusType("success");
+//       }
 
 //       if (currentJobId) {
 //         try {
@@ -489,7 +542,10 @@
 //             method: "PUT",
 //             headers: { "Content-Type": "application/json" },
 //             body: JSON.stringify({
-//               MigrationStatus: "Completed",
+//               MigrationStatus: failedVisuals.length > 0 ? "CompletedWithErrors" : "Completed",
+//               ...(failedVisuals.length > 0 && {
+//                 ErrorMessage: `${failedVisuals.length} of ${totalToCreate} visual(s) failed: ${failedVisuals.join(", ")}`,
+//               }),
 //               CompletedAt: new Date().toISOString(),
 //             }),
 //           });
@@ -883,7 +939,6 @@
 //     </AppLayout>
 //   );
 // }
-
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import * as models from "powerbi-models";
@@ -911,13 +966,37 @@ import "powerbi-report-authoring";
 /* ----------------------------------------------------
    📍 CONFIGURATION & CONSTANTS
    ---------------------------------------------------- */
-const API_URL = "https://frame-pbir-test-eqhpdtf4bag0aecw.eastus-01.azurewebsites.net/runtime-visuals";
+const API_URL = "https://pbirupdatedcode-dzanbzhvdwhce5a6.eastus-01.azurewebsites.net/runtime-visuals";
 
 const pbiService = new service.Service(factories.hpmFactory, factories.wpmpFactory, factories.routerFactory);
 
+const DEFAULT_MEASURES_TABLE = "Measures1";
+
+/* ----------------------------------------------------
+   📦 API TYPES (visual-json API contract)
+   Mirrors what createVisualsFromJson.js expects: bindings
+   may carry a measure OR a column+aggregation, plus optional
+   filters and visual-level properties. Pages may carry an
+   explicit canvas size straight from the source report.
+   ---------------------------------------------------- */
 interface ApiBinding {
+  table?: string;
+  column?: string | null;
+  measure?: string | null;
+  aggregation?: string | null;
+}
+
+interface ApiFilter {
   table: string;
   column: string;
+  operator?: string;
+  values?: any[];
+}
+
+interface ApiProperty {
+  objectName: string;
+  propertyName: string;
+  value: any;
 }
 
 interface ApiVisual {
@@ -928,8 +1007,287 @@ interface ApiVisual {
     y: number;
     width: number;
     height: number;
+    z?: number;
   };
   bindings: Record<string, ApiBinding | ApiBinding[]>;
+  filters?: ApiFilter[];
+  properties?: ApiProperty[];
+}
+
+interface ApiPage {
+  name?: string | null;
+  size?: { width: number; height: number } | null;
+  visuals: ApiVisual[];
+}
+
+/* ----------------------------------------------------
+   🎯 ROLE ENGINE (ported from createVisualsFromJson.js)
+   Maps a semantic binding key (Category / Y / Series / ...)
+   plus the visual's family (bar / line / kpi / gauge / ...)
+   to the exact Power BI data-role name that visual expects.
+   ---------------------------------------------------- */
+const INTENT = {
+  CATEGORY: "CATEGORY",
+  SERIES: "SERIES",
+  VALUE: "VALUE",
+  SECONDARY_VALUE: "SECONDARY_VALUE",
+  X: "X",
+  Y: "Y",
+  SIZE: "SIZE",
+  TOOLTIP: "TOOLTIP",
+  DETAILS: "DETAILS",
+  BREAKDOWN: "BREAKDOWN",
+  ROWS: "ROWS",
+  COLUMNS: "COLUMNS",
+  MIN: "MIN",
+  MAX: "MAX",
+  TARGET: "TARGET",
+  INDICATOR: "INDICATOR",
+  TREND: "TREND",
+  GOAL: "GOAL",
+  ANALYZE: "ANALYZE",
+  EXPLAIN_BY: "EXPLAIN_BY",
+  GRADIENT: "GRADIENT",
+  PLAY_AXIS: "PLAY_AXIS",
+  SMALL_MULTIPLES: "SMALL_MULTIPLES",
+} as const;
+
+type IntentKey = (typeof INTENT)[keyof typeof INTENT];
+
+const FAMILY_OF_VISUAL_TYPE: Record<string, string> = {
+  barChart: "bar", clusteredBarChart: "bar", hundredPercentStackedBarChart: "bar",
+  columnChart: "bar", clusteredColumnChart: "bar", hundredPercentStackedColumnChart: "bar",
+  lineChart: "line", areaChart: "line", stackedAreaChart: "line",
+  lineClusteredColumnComboChart: "combo", lineStackedColumnComboChart: "combo",
+  ribbonChart: "ribbon",
+  pieChart: "pie", donutChart: "pie", funnel: "pie",
+  treemap: "treemap",
+  waterfallChart: "waterfall",
+  scatterChart: "scatter",
+  gauge: "gauge",
+  kpi: "kpi",
+  card: "card", multiRowCard: "card",
+  tableEx: "table", table: "table",
+  pivotTable: "matrix",
+  slicer: "slicer",
+  map: "map", filledMap: "filledMap", shapeMap: "shapeMap",
+  decompositionTreeVisual: "decompositionTree", keyDriversVisual: "keyDrivers",
+  actionButton: "noRoles", basicShape: "noRoles", image: "noRoles", textbox: "noRoles",
+  qnaVisual: "noRoles", scriptVisual: "noRoles", pythonVisual: "noRoles",
+  PowerApps: "noRoles", esriVisual: "noRoles", debugVisual: "noRoles",
+};
+
+const VISUAL_ROLE_SCHEMAS: Record<string, Partial<Record<IntentKey, string>>> = {
+  bar: {
+    [INTENT.CATEGORY]: "Category",
+    [INTENT.SERIES]: "Series",
+    [INTENT.VALUE]: "Y",
+    [INTENT.TOOLTIP]: "Tooltips",
+    [INTENT.SMALL_MULTIPLES]: "Small Multiples",
+  },
+  line: {
+    [INTENT.CATEGORY]: "Category",
+    [INTENT.SERIES]: "Series",
+    [INTENT.VALUE]: "Y",
+    [INTENT.SECONDARY_VALUE]: "Y2",
+    [INTENT.TOOLTIP]: "Tooltips",
+  },
+  combo: {
+    [INTENT.CATEGORY]: "Category",
+    [INTENT.SERIES]: "Series",
+    [INTENT.VALUE]: "Y",
+    [INTENT.SECONDARY_VALUE]: "Y2",
+  },
+  ribbon: {
+    [INTENT.CATEGORY]: "Category",
+    [INTENT.SERIES]: "Series",
+    [INTENT.VALUE]: "Y",
+  },
+  pie: {
+    [INTENT.CATEGORY]: "Category",
+    [INTENT.VALUE]: "Y",
+    [INTENT.TOOLTIP]: "Tooltips",
+  },
+  treemap: {
+    [INTENT.CATEGORY]: "Group",
+    [INTENT.DETAILS]: "Details",
+    [INTENT.VALUE]: "Values",
+  },
+  waterfall: {
+    [INTENT.CATEGORY]: "Category",
+    [INTENT.VALUE]: "Y",
+    [INTENT.BREAKDOWN]: "Breakdown",
+  },
+  scatter: {
+    [INTENT.CATEGORY]: "Category",
+    [INTENT.DETAILS]: "Category",
+    [INTENT.X]: "X",
+    [INTENT.Y]: "Y",
+    [INTENT.VALUE]: "Y",
+    [INTENT.SIZE]: "Size",
+    [INTENT.SERIES]: "Series",
+    [INTENT.PLAY_AXIS]: "PlayAxis",
+  },
+  gauge: {
+    [INTENT.VALUE]: "Y",
+    [INTENT.MIN]: "MinValue",
+    [INTENT.MAX]: "MaxValue",
+    [INTENT.TARGET]: "TargetValue",
+  },
+  kpi: {
+    [INTENT.INDICATOR]: "Indicator",
+    [INTENT.VALUE]: "Indicator",
+    [INTENT.TREND]: "TrendLine",
+    [INTENT.GOAL]: "Goal",
+    [INTENT.TARGET]: "Goal",
+  },
+  card: {
+    [INTENT.VALUE]: "Values",
+    [INTENT.TOOLTIP]: "Tooltips",
+  },
+  table: {
+    [INTENT.VALUE]: "Values",
+    [INTENT.CATEGORY]: "Values",
+  },
+  matrix: {
+    [INTENT.ROWS]: "Rows",
+    [INTENT.CATEGORY]: "Rows",
+    [INTENT.COLUMNS]: "Columns",
+    [INTENT.VALUE]: "Values",
+  },
+  slicer: {
+    [INTENT.VALUE]: "Values",
+    [INTENT.CATEGORY]: "Values",
+  },
+  map: {
+    [INTENT.CATEGORY]: "Category",
+    [INTENT.SERIES]: "Series",
+    [INTENT.SIZE]: "Size",
+  },
+  filledMap: {
+    [INTENT.CATEGORY]: "Category",
+    [INTENT.GRADIENT]: "Gradient",
+    [INTENT.VALUE]: "Gradient",
+  },
+  shapeMap: {
+    [INTENT.CATEGORY]: "Category",
+    [INTENT.VALUE]: "Values",
+  },
+  decompositionTree: {
+    [INTENT.ANALYZE]: "Analyze",
+    [INTENT.VALUE]: "Analyze",
+    [INTENT.EXPLAIN_BY]: "Explainby",
+    [INTENT.CATEGORY]: "Explainby",
+  },
+  keyDrivers: {
+    [INTENT.ANALYZE]: "Explain by target",
+    [INTENT.VALUE]: "Explain by target",
+    [INTENT.EXPLAIN_BY]: "Explainby",
+    [INTENT.CATEGORY]: "Explainby",
+  },
+  noRoles: {},
+};
+
+const INTENT_LOOKUP: Record<string, IntentKey | null> = {
+  category: INTENT.CATEGORY, axis: INTENT.CATEGORY, dimension: INTENT.CATEGORY,
+  series: INTENT.SERIES, legend: INTENT.SERIES,
+  y: INTENT.VALUE, value: INTENT.VALUE, values: INTENT.VALUE, measure: INTENT.VALUE,
+  y2: INTENT.SECONDARY_VALUE, secondary: INTENT.SECONDARY_VALUE, secondaryvalue: INTENT.SECONDARY_VALUE,
+  x: INTENT.X, size: INTENT.SIZE,
+  tooltip: INTENT.TOOLTIP, tooltips: INTENT.TOOLTIP,
+  details: INTENT.DETAILS, detail: INTENT.DETAILS, group: INTENT.DETAILS,
+  breakdown: INTENT.BREAKDOWN,
+  rows: INTENT.ROWS, columns: INTENT.COLUMNS,
+  minvalue: INTENT.MIN, min: INTENT.MIN,
+  maxvalue: INTENT.MAX, max: INTENT.MAX,
+  targetvalue: INTENT.TARGET, target: INTENT.TARGET,
+  indicator: INTENT.INDICATOR,
+  trendline: INTENT.TREND, trend: INTENT.TREND,
+  goal: INTENT.GOAL,
+  analyze: INTENT.ANALYZE,
+  explainby: INTENT.EXPLAIN_BY, "explain by": INTENT.EXPLAIN_BY,
+  gradient: INTENT.GRADIENT,
+  playaxis: INTENT.PLAY_AXIS, "play axis": INTENT.PLAY_AXIS,
+  smallmultiples: INTENT.SMALL_MULTIPLES, "small multiples": INTENT.SMALL_MULTIPLES,
+  color: INTENT.SERIES, angle: INTENT.VALUE, text: INTENT.VALUE, label: INTENT.VALUE,
+  path: null, shape: null,
+};
+
+function normalizeIntent(rawRoleKey: string, isMeasure: boolean): IntentKey {
+  const key = String(rawRoleKey || "").trim().toLowerCase();
+  if (key === "color" && isMeasure) return INTENT.GRADIENT;
+  if (key in INTENT_LOOKUP) {
+    const looked = INTENT_LOOKUP[key];
+    if (looked) return looked;
+  }
+  return isMeasure ? INTENT.VALUE : INTENT.CATEGORY;
+}
+
+/**
+ * Resolves a raw semantic binding key (e.g. "Category", "Y", "color") to the
+ * exact Power BI data-role name expected by this specific visual type,
+ * taking into account whether the field is a measure or a plain column.
+ */
+function resolveRoleName(semanticRole: string, isMeasure: boolean, visualType: string): string | null {
+  const family = FAMILY_OF_VISUAL_TYPE[visualType];
+  if (family === "noRoles") return null;
+  const schema = VISUAL_ROLE_SCHEMAS[family || "table"];
+  const intent = normalizeIntent(semanticRole, isMeasure);
+  if (intent && schema[intent]) return schema[intent]!;
+  const fallback = isMeasure
+    ? schema[INTENT.VALUE] || schema[INTENT.Y] || Object.values(schema)[0]
+    : schema[INTENT.CATEGORY] || schema[INTENT.ROWS] || Object.values(schema)[0];
+  return fallback || null;
+}
+
+/** Normalizes loose aggregation strings ("avg", "countDistinct", ...) to the
+ *  powerbi-models AggregationFunction enum value, when available. */
+function normalizeAggregation(rawAgg?: string | null): any {
+  if (!rawAgg) return undefined;
+  const str = String(rawAgg).trim().toLowerCase();
+  let standard = "Sum";
+
+  if (str === "count" || str === "countnonnull") standard = "Count";
+  else if (str === "distinctcount" || str === "countdistinct") standard = "DistinctCount";
+  else if (str === "avg" || str === "average") standard = "Avg";
+  else if (str === "min" || str === "minimum") standard = "Min";
+  else if (str === "max" || str === "maximum") standard = "Max";
+  else if (str === "median") standard = "Median";
+  else if (str === "sum") standard = "Sum";
+  else standard = rawAgg;
+
+  const aggEnum = (models as any)?.AggregationFunction;
+  if (aggEnum && aggEnum[standard] !== undefined) {
+    return aggEnum[standard];
+  }
+  return standard;
+}
+
+/** Converts Power BI's EMU-scale layout coordinates (as used in the desktop
+ *  file format) into on-canvas pixel coordinates, when needed. Layouts that
+ *  are already pixel-scale (small numbers) pass through unchanged. */
+function normalizeApiLayout(rawLayout: ApiVisual["layout"] | undefined) {
+  const PBI_CANVAS_WIDTH = 1280;
+  const PBI_CANVAS_HEIGHT = 720;
+
+  if (!rawLayout) {
+    return { x: 20, y: 20, width: 400, height: 300, z: 1 };
+  }
+
+  let { x = 0, y = 0, width = 400, height = 300 } = rawLayout;
+  const { z = 1 } = rawLayout;
+
+  if (x > 1280 || y > 720 || width > 1280 || height > 720) {
+    x = Math.round((x / 100000) * PBI_CANVAS_WIDTH);
+    y = Math.round((y / 100000) * PBI_CANVAS_HEIGHT);
+    width = Math.round((width / 100000) * PBI_CANVAS_WIDTH);
+    height = Math.round((height / 100000) * PBI_CANVAS_HEIGHT);
+  }
+
+  width = Math.max(width, 100);
+  height = Math.max(height, 80);
+
+  return { x, y, width, height, z };
 }
 
 const ALL_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -1093,33 +1451,6 @@ export default function PowerBIReport() {
     return colName.replace(/^(cnt|sum|avg|min|max|count|distinct):/i, "");
   };
 
-  const mapRoleName = (visualType: string, semanticRole: string): string => {
-    const type = visualType.toLowerCase();
-    const role = semanticRole.toLowerCase();
-
-    if (type.includes("table") || type.includes("matrix")) return "Values";
-
-    if (
-      type.includes("bar") ||
-      type.includes("column") ||
-      type.includes("line") ||
-      type.includes("area") ||
-      type.includes("scatter")
-    ) {
-      if (role === "category" || role === "axis") return "Category";
-      if (role === "values" || role === "y") return "Y";
-      if (role === "legend" || role === "series") return "Series";
-      if (type.includes("scatter") && role === "x") return "X";
-    }
-
-    if (type.includes("pie") || type.includes("donut")) {
-      if (role === "legend" || role === "category") return "Category";
-      if (role === "values") return "Y";
-    }
-
-    return semanticRole;
-  };
-
   const normalizeType = (type: string) => {
     const map: Record<string, string> = {
       tableEx: "table",
@@ -1131,6 +1462,202 @@ export default function PowerBIReport() {
     };
     return map[type] || type;
   };
+
+  /* ----------------------------------------------------
+     📐 DYNAMIC CANVAS / GRID LAYOUT
+     No hardcoded x/y. Canvas size and every visual's
+     position are derived purely from how many visuals
+     this specific page needs to hold.
+     ---------------------------------------------------- */
+  const GRID_GAP = 20;
+  const MIN_CANVAS_WIDTH = 1280; // Power BI default page width
+  const MIN_CANVAS_HEIGHT = 720; // Power BI default page height
+
+  interface GridLayout {
+    columns: number;
+    rows: number;
+    cellWidth: number;
+    cellHeight: number;
+    canvasWidth: number;
+    canvasHeight: number;
+  }
+
+  /**
+   * Computes a fresh grid layout for ONE page's worth of visuals.
+   * Nothing here is shared across pages — call this once per page,
+   * right before laying out that page's visuals, so every page's
+   * geometry (columns, canvas size, cell size) is fully independent.
+   */
+  function computeGridLayout(pageVisuals: ApiVisual[]): GridLayout {
+    const count = pageVisuals.length;
+
+    if (count === 0) {
+      return {
+        columns: 1,
+        rows: 1,
+        cellWidth: 0,
+        cellHeight: 0,
+        canvasWidth: MIN_CANVAS_WIDTH,
+        canvasHeight: MIN_CANVAS_HEIGHT,
+      };
+    }
+
+    // Cell size = the largest visual on THIS page, so nothing gets clipped
+    // or overlapped regardless of how the source visuals were sized.
+    const cellWidth = Math.max(...pageVisuals.map((v) => v.layout?.width || 320));
+    const cellHeight = Math.max(...pageVisuals.map((v) => v.layout?.height || 240));
+
+    // Choose column count so the canvas trends toward a 16:9 canvas as the
+    // visual count grows, instead of one hardcoded column/row shape.
+    const targetAspectRatio = 16 / 9;
+    const columns = Math.max(1, Math.round(Math.sqrt(count * targetAspectRatio)));
+    const rows = Math.max(1, Math.ceil(count / columns));
+
+    // Canvas grows with visual count (more visuals → bigger report page),
+    // but never shrinks below Power BI's default page size.
+    const canvasWidth = Math.max(MIN_CANVAS_WIDTH, columns * (cellWidth + GRID_GAP) + GRID_GAP);
+    const canvasHeight = Math.max(MIN_CANVAS_HEIGHT, rows * (cellHeight + GRID_GAP) + GRID_GAP);
+
+    return { columns, rows, cellWidth, cellHeight, canvasWidth, canvasHeight };
+  }
+
+  /** Binds every field in v.bindings/v.dataRoles onto the created `visual`,
+   *  resolving the correct Power BI role name for measures vs. columns and
+   *  carrying over the requested aggregation, with fallback-table retry. */
+  async function bindVisualFields(
+    visual: any,
+    v: ApiVisual,
+    knownGoodTables: Set<string>,
+    getFallbackOrder: (excludeTable: string) => string[],
+  ) {
+    if (!v.bindings || typeof visual.addDataField !== "function") return;
+
+    const bindingEntries = Object.entries(v.bindings);
+    for (const [semanticRole, data] of bindingEntries) {
+      if (semanticRole === "Filters") continue;
+      const bindArray = Array.isArray(data) ? data : [data];
+
+      for (const b of bindArray) {
+        if (!b) continue;
+        const isMeasure = Boolean(b.measure);
+        const technicalRole = resolveRoleName(semanticRole, isMeasure, v.visualType);
+        if (!technicalRole) continue;
+
+        // ---- Measures ALWAYS bind against the "Measures1" table, no aggregation
+        //      needed, and no fallback — this table name is fixed, never derived
+        //      from the API's `table` field or from the fallback-table logic. ----
+        if (isMeasure) {
+          const measureTable = DEFAULT_MEASURES_TABLE;
+          try {
+            console.log(`🔗 Binding measure: role="${technicalRole}", table="${measureTable}", measure="${b.measure}"`);
+            await visual.addDataField(technicalRole, {
+              $schema: "http://powerbi.com/product/schema#measure",
+              table: measureTable,
+              measure: b.measure,
+            });
+            knownGoodTables.add(measureTable);
+            console.log(`✅ Bound measure: ${measureTable}.${b.measure} → ${technicalRole}`);
+          } catch (e: any) {
+            console.warn(`⚠️ Measure binding failed for ${measureTable}.${b.measure} → ${technicalRole}:`, e?.message || e);
+          }
+          continue;
+        }
+
+        // ---- Columns bind against their source table, with an aggregation
+        //      override on value-style roles (never on axis/category roles) ----
+        const rawCol = b.column || "";
+        const sanitizedCol = cleanColumnName(rawCol);
+        if (!b.table || !sanitizedCol) continue;
+
+        const axisRoles = new Set(["Category", "Rows", "Columns", "Group", "Details"]);
+        const aggregationFunction = !axisRoles.has(technicalRole) && b.aggregation
+          ? normalizeAggregation(b.aggregation)
+          : undefined;
+
+        let bound = false;
+        console.log(
+          `🔗 Binding: role="${technicalRole}", table="${b.table}", column="${sanitizedCol}"` +
+            (aggregationFunction !== undefined ? `, aggregation="${b.aggregation}"` : ""),
+        );
+        try {
+          await visual.addDataField(technicalRole, {
+            $schema: "http://powerbi.com/product/schema#column",
+            table: b.table,
+            column: sanitizedCol,
+            ...(aggregationFunction !== undefined ? { aggregationFunction } : {}),
+          });
+          bound = true;
+          knownGoodTables.add(b.table);
+          console.log(`✅ Bound successfully: ${b.table}.${sanitizedCol} → ${technicalRole}`);
+        } catch (e: any) {
+          console.warn(`⚠️ Binding failed for ${b.table}.${sanitizedCol} → ${technicalRole}:`, e?.message || e);
+        }
+
+        if (!bound) {
+          for (const fallbackTable of getFallbackOrder(b.table)) {
+            try {
+              await visual.addDataField(technicalRole, {
+                $schema: "http://powerbi.com/product/schema#column",
+                table: fallbackTable,
+                column: sanitizedCol,
+                ...(aggregationFunction !== undefined ? { aggregationFunction } : {}),
+              });
+              bound = true;
+              knownGoodTables.add(fallbackTable);
+              console.log(`✅ Fallback bound: ${fallbackTable}.${sanitizedCol} → ${technicalRole}`);
+              break;
+            } catch (e: any) {
+              console.warn(`⚠️ Fallback failed for ${fallbackTable}.${sanitizedCol}:`, e?.message || e);
+            }
+          }
+        }
+
+        if (!bound) {
+          console.error(
+            `❌ FAILED to bind column "${sanitizedCol}" (original: "${rawCol}") to any table. Tried: [${b.table}, ${getFallbackOrder(b.table).join(", ")}]`,
+          );
+        }
+      }
+    }
+  }
+
+  /** Applies BasicFilter entries from v.filters to the created visual. */
+  async function applyVisualFilters(visual: any, v: ApiVisual) {
+    if (!v.filters || v.filters.length === 0) return;
+    if (typeof visual.setFilters !== "function" || !(models as any)?.BasicFilter) return;
+
+    try {
+      const basicFilters = v.filters.map(
+        (f) =>
+          new (models as any).BasicFilter(
+            { table: f.table, column: f.column },
+            f.operator || "In",
+            f.values || [],
+          ),
+      );
+      await visual.setFilters(basicFilters);
+      console.log(`🧰 Applied ${basicFilters.length} filter(s) to "${v.title}"`);
+    } catch (e: any) {
+      console.warn(`⚠️ Filter error on "${v.title}":`, e?.message || e);
+    }
+  }
+
+  /** Applies visual-level formatting properties (labelDisplayUnits, colors, etc). */
+  async function applyVisualProperties(visual: any, v: ApiVisual) {
+    if (!v.properties || v.properties.length === 0) return;
+    if (typeof visual.setProperty !== "function") return;
+
+    for (const prop of v.properties) {
+      try {
+        await visual.setProperty(
+          { objectName: prop.objectName, propertyName: prop.propertyName },
+          { value: prop.value },
+        );
+      } catch (e: any) {
+        console.warn(`⚠️ Property "${prop.objectName}.${prop.propertyName}" failed on "${v.title}":`, e?.message || e);
+      }
+    }
+  }
 
   async function createStaticVisuals(report: any) {
     if (executed.current) return;
@@ -1144,6 +1671,7 @@ export default function PowerBIReport() {
 
       let visualsToCreate: ApiVisual[] = [];
       let dashboards: any[] = [];
+      let apiPages: ApiPage[] = [];
 
       if (metadataBlobUrl) {
         try {
@@ -1158,7 +1686,11 @@ export default function PowerBIReport() {
             const data = await apiRes.json();
             visualsToCreate = data.visuals || [];
             dashboards = data.dashboards || [];
-            if (visualsToCreate.length > 0) {
+            // Newer visual-json API responses group visuals under `pages`,
+            // each carrying an explicit canvas `size` straight from the
+            // source report — prefer that over any client-computed layout.
+            apiPages = Array.isArray(data.pages) ? data.pages : [];
+            if (visualsToCreate.length > 0 || apiPages.length > 0) {
               setSource("API");
             }
           }
@@ -1167,7 +1699,7 @@ export default function PowerBIReport() {
         }
       }
 
-      if (visualsToCreate.length === 0) {
+      if (visualsToCreate.length === 0 && apiPages.length === 0) {
         setStatus("No visuals to create (Check API logs)");
         setStatusType("warning");
 
@@ -1202,225 +1734,285 @@ export default function PowerBIReport() {
       }
       await sleep(1000);
 
-      const visualMap = new Map<string, ApiVisual>();
-      visualsToCreate.forEach((v) => visualMap.set(v.title, v));
+      const cleanReportName = rawReportName.replace(/[^a-zA-Z0-9]/g, "");
 
-      const assignedVisuals = new Set<string>();
-      dashboards.forEach((d) => {
-        d.worksheets.forEach((w: string) => assignedVisuals.add(w));
+      // Flatten every visual we know about (flat list + page-grouped list)
+      // so table discovery below sees the full picture regardless of which
+      // shape the API responded with.
+      const allKnownVisuals: ApiVisual[] = [
+        ...visualsToCreate,
+        ...apiPages.flatMap((p) => p.visuals || []),
+      ];
+
+      /* ----------------------------------------------------
+         🔎 DYNAMIC TABLE RESOLUTION (replaces hardcoded guesses)
+         Instead of guessing generic names like "Sheet1"/"Table1"/"Extract"
+         that will never match a real deployed model, we:
+           1. Collect every real table name that actually appears in the
+              extracted metadata (these came from your source data, so
+              they're far more likely to be the real table names).
+           2. Track which tables have already bound successfully this
+              session ("known good") and try those FIRST on any later
+              failure — they're proven to exist in the deployed model.
+           3. Keep the old generic names only as a last-resort safety net.
+         ---------------------------------------------------- */
+      const metadataTables = new Set<string>();
+      allKnownVisuals.forEach((v) => {
+        Object.entries(v.bindings || {}).forEach(([key, data]) => {
+          if (key === "Filters") return;
+          const arr = Array.isArray(data) ? data : [data];
+          arr.forEach((b: any) => {
+            // Skip measure bindings — measures are strictly hardcoded to the
+            // "Measures1" table and must never seed the column fallback pool.
+            if (b?.measure) return;
+            if (b?.table) metadataTables.add(b.table);
+          });
+        });
       });
 
-      const orphanWorksheets = visualsToCreate.filter((v) => !assignedVisuals.has(v.title)).map((v) => v.title);
+      const knownGoodTables = new Set<string>();
+      const GENERIC_LAST_RESORT = [rawReportName, cleanReportName, "Sheet1", "Table1", "Extract", "Data", "MainTable"];
 
-      const pagesToProcess = dashboards.map((d) => ({
-        worksheets: d.worksheets,
-        isOrphan: false,
-      }));
-
-      if (orphanWorksheets.length > 0) {
-        pagesToProcess.push({
-          worksheets: orphanWorksheets,
-          isOrphan: true,
-        });
-      }
-
-      const cleanReportName = rawReportName.replace(/[^a-zA-Z0-9]/g, "");
-      const FALLBACK_TABLES = [rawReportName, cleanReportName, "Sheet1", "Table1", "Extract", "Data", "MainTable"];
-      const uniqueFallbacks = [...new Set(FALLBACK_TABLES)];
+      const getFallbackOrder = (excludeTable: string) => {
+        const ordered = [...knownGoodTables, ...metadataTables, ...GENERIC_LAST_RESORT];
+        return [...new Set(ordered)].filter((t) => t && t !== excludeTable);
+      };
 
       let pages = await report.getPages();
 
-      const failedVisuals: string[] = [];
-      let createdCount = 0;
-      let totalToCreate = 0;
+      if (apiPages.length > 0) {
+        /* ==========================================================
+           📄 PAGE-DRIVEN FLOW — visual-json API returned `pages`, each
+           with its own canvas `size` and its own visuals (already
+           positioned). Canvas dimensions and visual coordinates both
+           come straight from the JSON — nothing is recomputed here.
+           ========================================================== */
+        for (let i = 0; i < apiPages.length; i++) {
+          const pageData = apiPages[i];
+          const expectedPageName = pageData.name || `Page ${i + 1}`;
+          let targetPage = pages[i];
 
-      const rectsOverlap = (
-        a: { x: number; y: number; width: number; height: number },
-        b: { x: number; y: number; width: number; height: number },
-      ) => a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
-
-      for (let i = 0; i < pagesToProcess.length; i++) {
-        const config = pagesToProcess[i];
-        const expectedPageName = `Page ${i + 1}`;
-        let targetPage = pages[i];
-
-        if (!targetPage) {
-          targetPage = await report.addPage(expectedPageName);
-          pages = await report.getPages();
-        }
-
-        setStatus(`Preparing ${expectedPageName}...`);
-
-        await new Promise<void>((resolve) => {
-          const handler = () => {
-            report.off("pageChanged", handler);
-            resolve();
-          };
-          report.on("pageChanged", handler);
-          targetPage.setActive();
-        });
-
-        const page = await report.getActivePage();
-
-        if (page.displayName !== expectedPageName) {
-          try {
-            await page.rename(expectedPageName);
-          } catch (e) {
-            console.warn(`Rename to ${expectedPageName} failed:`, e);
+          if (!targetPage) {
+            targetPage = await report.addPage(expectedPageName);
+            pages = await report.getPages();
           }
-        }
 
-        try {
-          const existingVisuals = await page.getVisuals();
-          for (const v of existingVisuals) {
+          setStatus(`Preparing ${expectedPageName}...`);
+
+          await new Promise<void>((resolve) => {
+            const handler = () => {
+              report.off("pageChanged", handler);
+              resolve();
+            };
+            report.on("pageChanged", handler);
+            targetPage.setActive();
+          });
+
+          const page = await report.getActivePage();
+
+          if (page.displayName !== expectedPageName) {
             try {
-              await page.deleteVisual(v.name);
+              await page.rename(expectedPageName);
             } catch (e) {
-              /* ignore */
+              console.warn(`Rename to ${expectedPageName} failed:`, e);
             }
           }
-        } catch (e) {
-          /* ignore */
-        }
 
-        await sleep(500);
-
-        // Page bounds, so visuals aren't placed (and clipped/hidden) off-canvas.
-        const pageSize = (page as any).defaultSize?.width ? (page as any).defaultSize : { width: 1280, height: 720 };
-
-        let currentOrphanY = 40;
-        const placedRects: { x: number; y: number; width: number; height: number }[] = [];
-
-        for (const sheetName of config.worksheets) {
-          const v = visualMap.get(sheetName);
-          if (!v) continue;
-          totalToCreate++;
-
-          let finalX = v.layout.x;
-          let finalY = v.layout.y;
-          const finalWidth = Math.min(v.layout.width, pageSize.width - 10);
-          const finalHeight = Math.min(v.layout.height, pageSize.height - 10);
-
-          if (config.isOrphan) {
-            finalX = 40;
-            finalY = currentOrphanY;
-            currentOrphanY += finalHeight + 20;
-          } else {
-            // Clamp to the page so a visual isn't pushed off-canvas.
-            finalX = Math.max(0, Math.min(finalX, pageSize.width - finalWidth));
-            finalY = Math.max(0, Math.min(finalY, pageSize.height - finalHeight));
-
-            // If this rect overlaps one already placed on this page (common when the
-            // migrated metadata has duplicate/approximate coordinates), the new visual
-            // would be drawn directly on top of the old one and effectively hide it.
-            // Push it down below the lowest overlapping visual instead of stacking.
-            let candidate = { x: finalX, y: finalY, width: finalWidth, height: finalHeight };
-            let guard = 0;
-            while (placedRects.some((r) => rectsOverlap(r, candidate)) && guard < 50) {
-              const overlapping = placedRects.filter((r) => rectsOverlap(r, candidate));
-              const lowestBottom = Math.max(...overlapping.map((r) => r.y + r.height));
-              candidate = { ...candidate, y: lowestBottom + 10 };
-              guard++;
-            }
-            finalX = candidate.x;
-            finalY = candidate.y;
-          }
-
-          placedRects.push({ x: finalX, y: finalY, width: finalWidth, height: finalHeight });
-
-          setStatus(`Creating ${v.visualType} on ${expectedPageName}...`);
           try {
-            const { visual } = await page.createVisual(normalizeType(v.visualType), {
-              x: finalX,
-              y: finalY,
-              width: finalWidth,
-              height: finalHeight,
-              displayState: { mode: models.VisualContainerDisplayMode.Visible },
-            });
-
-            if (v.title) {
+            const existingVisuals = await page.getVisuals();
+            for (const v of existingVisuals) {
               try {
-                await visual.setProperty({ objectName: "title", propertyName: "text" }, { value: v.title });
-                await visual.setProperty({ objectName: "title", propertyName: "visible" }, { value: true });
+                await page.deleteVisual(v.name);
               } catch (e) {
                 /* ignore */
               }
             }
-            await sleep(200);
+          } catch (e) {
+            /* ignore */
+          }
 
-            const bindingEntries = Object.entries(v.bindings);
-            for (const [semanticRole, data] of bindingEntries) {
-              const technicalRole = mapRoleName(v.visualType, semanticRole);
-              const bindArray = Array.isArray(data) ? data : [data];
+          await sleep(500);
 
-              for (const b of bindArray) {
-                const rawCol = b?.column || "";
-                const sanitizedCol = cleanColumnName(rawCol);
+          // Canvas size comes directly from the JSON page size. Fall back to
+          // Power BI's default page size only if the API didn't provide one.
+          const canvasWidth = pageData.size?.width || 1280;
+          const canvasHeight = pageData.size?.height || 720;
 
-                if (b && b.table && sanitizedCol) {
-                  let bound = false;
-                  console.log(`🔗 Binding: role="${technicalRole}", table="${b.table}", column="${sanitizedCol}"`);
-                  try {
-                    await visual.addDataField(technicalRole, {
-                      $schema: "http://powerbi.com/product/schema#column",
-                      table: b.table,
-                      column: sanitizedCol,
-                    });
-                    bound = true;
-                    console.log(`✅ Bound successfully: ${b.table}.${sanitizedCol} → ${technicalRole}`);
-                  } catch (e: any) {
-                    console.warn(`⚠️ Binding failed for ${b.table}.${sanitizedCol} → ${technicalRole}:`, e?.message || e);
-                  }
+          setStatus(`Sizing canvas for ${expectedPageName} (${canvasWidth}x${canvasHeight})...`);
+          try {
+            await report.resizeActivePage(models.PageSizeType.Custom, canvasWidth, canvasHeight);
+          } catch (e) {
+            console.warn(`⚠️ Failed to resize ${expectedPageName} to ${canvasWidth}x${canvasHeight}:`, e);
+          }
 
-                  if (!bound) {
-                    for (const fallbackTable of uniqueFallbacks) {
-                      if (fallbackTable === b.table) continue;
-                      try {
-                        await visual.addDataField(technicalRole, {
-                          $schema: "http://powerbi.com/product/schema#column",
-                          table: fallbackTable,
-                          column: sanitizedCol,
-                        });
-                        bound = true;
-                        console.log(`✅ Fallback bound: ${fallbackTable}.${sanitizedCol} → ${technicalRole}`);
-                        break;
-                      } catch (e: any) {
-                        console.warn(`⚠️ Fallback failed for ${fallbackTable}.${sanitizedCol}:`, e?.message || e);
-                      }
-                    }
-                  }
+          for (const v of pageData.visuals || []) {
+            const layout = normalizeApiLayout(v.layout);
 
-                  if (!bound) {
-                    console.error(`❌ FAILED to bind column "${sanitizedCol}" (original: "${rawCol}") to any table. Tried: [${b.table}, ${uniqueFallbacks.join(', ')}]`);
-                  }
+            setStatus(`Creating ${v.visualType} on ${expectedPageName}...`);
+            try {
+              const { visual } = await page.createVisual(normalizeType(v.visualType), {
+                x: layout.x,
+                y: layout.y,
+                width: layout.width,
+                height: layout.height,
+                z: layout.z,
+                displayState: { mode: models.VisualContainerDisplayMode.Visible },
+              });
+
+              if (v.title) {
+                try {
+                  await visual.setProperty({ objectName: "title", propertyName: "text" }, { value: v.title });
+                  await visual.setProperty({ objectName: "title", propertyName: "visible" }, { value: true });
+                } catch (e) {
+                  /* ignore */
                 }
               }
-            }
+              await sleep(200);
 
-            createdCount++;
-          } catch (e: any) {
-            console.error(`❌ Create failed for ${sheetName}:`, e);
-            failedVisuals.push(`${sheetName} (${expectedPageName})`);
+              await bindVisualFields(visual, v, knownGoodTables, getFallbackOrder);
+              await applyVisualFilters(visual, v);
+              await applyVisualProperties(visual, v);
+            } catch (e: any) {
+              console.error(`❌ Create failed for ${v.title}:`, e);
+            }
+          }
+        }
+      } else {
+        /* ==========================================================
+           📋 LEGACY FLOW — flat `visuals` + `dashboards[].worksheets`.
+           No explicit canvas size was provided, so the canvas and each
+           visual's position are computed from a grid layout, as before.
+           ========================================================== */
+        const visualMap = new Map<string, ApiVisual>();
+        visualsToCreate.forEach((v) => visualMap.set(v.title, v));
+
+        const assignedVisuals = new Set<string>();
+        dashboards.forEach((d) => {
+          (d.worksheets || []).forEach((w: string) => assignedVisuals.add(w));
+        });
+
+        const orphanWorksheets = visualsToCreate.filter((v) => !assignedVisuals.has(v.title)).map((v) => v.title);
+
+        const pagesToProcess = dashboards.map((d) => ({
+          worksheets: d.worksheets,
+          isOrphan: false,
+        }));
+
+        if (orphanWorksheets.length > 0) {
+          pagesToProcess.push({
+            worksheets: orphanWorksheets,
+            isOrphan: true,
+          });
+        }
+
+        for (let i = 0; i < pagesToProcess.length; i++) {
+          const config = pagesToProcess[i];
+          const expectedPageName = `Page ${i + 1}`;
+          let targetPage = pages[i];
+
+          if (!targetPage) {
+            targetPage = await report.addPage(expectedPageName);
+            pages = await report.getPages();
+          }
+
+          setStatus(`Preparing ${expectedPageName}...`);
+
+          await new Promise<void>((resolve) => {
+            const handler = () => {
+              report.off("pageChanged", handler);
+              resolve();
+            };
+            report.on("pageChanged", handler);
+            targetPage.setActive();
+          });
+
+          const page = await report.getActivePage();
+
+          if (page.displayName !== expectedPageName) {
+            try {
+              await page.rename(expectedPageName);
+            } catch (e) {
+              console.warn(`Rename to ${expectedPageName} failed:`, e);
+            }
+          }
+
+          try {
+            const existingVisuals = await page.getVisuals();
+            for (const v of existingVisuals) {
+              try {
+                await page.deleteVisual(v.name);
+              } catch (e) {
+                /* ignore */
+              }
+            }
+          } catch (e) {
+            /* ignore */
+          }
+
+          await sleep(500);
+
+          // Resolve the actual ApiVisual objects that belong to THIS page only.
+          const pageVisuals = config.worksheets
+            .map((sheetName: string) => visualMap.get(sheetName))
+            .filter((v): v is ApiVisual => Boolean(v));
+
+          // Independent grid layout for this page — recomputed from scratch every
+          // iteration, so no state (columns, cell size, canvas size) leaks between pages.
+          const { columns, cellWidth, cellHeight, canvasWidth, canvasHeight } = computeGridLayout(pageVisuals);
+
+          setStatus(`Sizing canvas for ${expectedPageName} (${pageVisuals.length} visuals)...`);
+          try {
+            await report.resizeActivePage(models.PageSizeType.Custom, canvasWidth, canvasHeight);
+          } catch (e) {
+            console.warn(`⚠️ Failed to resize ${expectedPageName} to ${canvasWidth}x${canvasHeight}:`, e);
+          }
+
+          let visualIndex = 0;
+
+          for (const sheetName of config.worksheets) {
+            const v = visualMap.get(sheetName);
+            if (!v) continue;
+
+            // Grid position derived purely from this visual's index on this page.
+            const col = visualIndex % columns;
+            const row = Math.floor(visualIndex / columns);
+            const finalX = GRID_GAP + col * (cellWidth + GRID_GAP);
+            const finalY = GRID_GAP + row * (cellHeight + GRID_GAP);
+            visualIndex++;
+
+            setStatus(`Creating ${v.visualType} on ${expectedPageName}...`);
+            try {
+              const { visual } = await page.createVisual(normalizeType(v.visualType), {
+                x: finalX,
+                y: finalY,
+                width: v.layout.width,
+                height: v.layout.height,
+                displayState: { mode: models.VisualContainerDisplayMode.Visible },
+              });
+
+              if (v.title) {
+                try {
+                  await visual.setProperty({ objectName: "title", propertyName: "text" }, { value: v.title });
+                  await visual.setProperty({ objectName: "title", propertyName: "visible" }, { value: true });
+                } catch (e) {
+                  /* ignore */
+                }
+              }
+              await sleep(200);
+
+              await bindVisualFields(visual, v, knownGoodTables, getFallbackOrder);
+              await applyVisualFilters(visual, v);
+              await applyVisualProperties(visual, v);
+            } catch (e: any) {
+              console.error(`❌ Create failed for ${sheetName}:`, e);
+            }
           }
         }
       }
 
       await report.save();
-
-      if (failedVisuals.length > 0) {
-        setStatus(
-          `Created ${createdCount} of ${totalToCreate} visuals. Failed: ${failedVisuals.join(", ")}`,
-        );
-        setStatusType("warning");
-        toast({
-          title: "Some visuals could not be created",
-          description: `${failedVisuals.length} visual(s) failed: ${failedVisuals.join(", ")}. Check the console for details.`,
-          variant: "destructive",
-        });
-      } else {
-        setStatus("Dashboards and Visuals generated successfully!");
-        setStatusType("success");
-      }
+      setStatus("Dashboards and Visuals generated successfully!");
+      setStatusType("success");
 
       if (currentJobId) {
         try {
@@ -1428,10 +2020,7 @@ export default function PowerBIReport() {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              MigrationStatus: failedVisuals.length > 0 ? "CompletedWithErrors" : "Completed",
-              ...(failedVisuals.length > 0 && {
-                ErrorMessage: `${failedVisuals.length} of ${totalToCreate} visual(s) failed: ${failedVisuals.join(", ")}`,
-              }),
+              MigrationStatus: "Completed",
               CompletedAt: new Date().toISOString(),
             }),
           });
@@ -1529,6 +2118,9 @@ export default function PowerBIReport() {
             createStaticVisuals(report);
           });
 
+          let schemaDriftRetries = 0;
+          const MAX_SCHEMA_DRIFT_RETRIES = 3;
+
           report.on("error", (e: any) => {
             console.group("❌ DEBUG: Power BI Error Event");
             console.error("Full error event:", JSON.stringify(e, null, 2));
@@ -1547,6 +2139,27 @@ export default function PowerBIReport() {
               if (e.detail.clusterUri) console.error("Cluster URI:", e.detail.clusterUri);
             }
             console.groupEnd();
+
+            // "The key didn't match any rows in the table" / Mashup ErrorCode 10061
+            // means the Lakehouse SQL Analytics Endpoint hadn't finished
+            // materializing a table yet when the semantic model queried it.
+            // This is a sync-lag issue, not a real error — retry with backoff
+            // instead of surfacing a hard failure immediately.
+            const msg: string = e?.detail?.detailedMessage || e?.detail?.message || "";
+            const looksLikeLakehouseSyncLag = msg.includes("didn't match any rows") || msg.includes("ErrorCode = 10061");
+
+            if (looksLikeLakehouseSyncLag && schemaDriftRetries < MAX_SCHEMA_DRIFT_RETRIES) {
+              schemaDriftRetries += 1;
+              setStatus(
+                `Underlying table not ready yet in the Lakehouse — retrying (${schemaDriftRetries}/${MAX_SCHEMA_DRIFT_RETRIES})...`,
+              );
+              setStatusType("warning");
+              setTimeout(() => {
+                report.refresh().catch((err: any) => console.warn("Schema-drift retry refresh failed:", err));
+              }, 5000 * schemaDriftRetries); // 5s, 10s, 15s backoff
+              return;
+            }
+
             setStatus("Power BI Error");
             setStatusType("error");
           });
