@@ -52,4 +52,4 @@ jobs:
           app-name: 'reportmigration-frontend'
           slot-name: 'Production'
           package: .
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_BEF883E1E1F74608963C46F704BB247D }}
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_83508C2E34ED4FE09AA9E713A2EA8AE2 }}
