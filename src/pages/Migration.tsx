@@ -158,7 +158,7 @@ export default function Migration() {
 
         // 1c) Extract metadata
         const metaRes = await fetch(
-          `https://frame-metadata-test-c3h3ajftb7b0edek.eastus-01.azurewebsites.net/extract-metadata?folder_name=${encodeURIComponent(reportName)}`,
+          `https://relationshipss-b3fbh7cehtfjghhr.eastus-01.azurewebsites.net/extract-metadata?folder_name=${encodeURIComponent(reportName)}`,
           { method: "POST" },
         );
         if (!metaRes.ok) throw new Error(`Metadata extraction failed (${metaRes.status})`);
