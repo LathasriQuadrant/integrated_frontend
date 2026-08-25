@@ -10,7 +10,7 @@ import { buildTableauTree } from "@/data/tableauTreeMapper";
 // Integrated backend (existing Tableau routes + new Pre-Migration AI
 // Analysis routes) now runs as a single local app. Override with
 // VITE_TABLEAU_BACKEND_URL for a non-local deployment.
-const TABLEAU_BACKEND_URL = import.meta.env.VITE_TABLEAU_BACKEND_URL || "http://localhost:8000";
+const TABLEAU_BACKEND_URL = import.meta.env.VITE_TABLEAU_BACKEND_URL || "https://frame-premigration-test-cabfgrazgacqgzf9.eastus-01.azurewebsites.net";
 
 interface TableauAuthModalProps {
   isOpen: boolean;
