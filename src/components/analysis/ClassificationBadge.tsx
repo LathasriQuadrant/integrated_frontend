@@ -30,4 +30,4 @@ const ClassificationBadge = ({ value, className }: ClassificationBadgeProps) => 
   );
 };
 
-export default ClassificationBadge;
+export default ClassificationBadge; 
