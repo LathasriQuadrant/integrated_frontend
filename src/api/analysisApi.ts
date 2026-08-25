@@ -2,7 +2,7 @@ import { AnalyzeRequest, FullAnalysisResponse } from "@/types/analysis";
 
 // Same integrated backend as the existing /tableau routes.
 // Override with VITE_TABLEAU_BACKEND_URL for a non-local deployment.
-const TABLEAU_BACKEND_URL = import.meta.env.VITE_TABLEAU_BACKEND_URL || "http://localhost:8000";
+const TABLEAU_BACKEND_URL = "https://frame-premigration-test-cabfgrazgacqgzf9.eastus-01.azurewebsites.net";
 
 export class AnalysisApiError extends Error {
   status?: number;
