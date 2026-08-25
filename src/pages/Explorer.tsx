@@ -26,7 +26,7 @@ import { Loader2 } from "lucide-react";
 // Integrated backend (existing Tableau routes + new Pre-Migration AI
 // Analysis routes) now runs as a single local app. Override with
 // VITE_TABLEAU_BACKEND_URL for a non-local deployment.
-const TABLEAU_BACKEND_URL = import.meta.env.VITE_TABLEAU_BACKEND_URL || "http://localhost:8000";
+const TABLEAU_BACKEND_URL = "https://frame-premigration-test-cabfgrazgacqgzf9.eastus-01.azurewebsites.net";
 
 const sourceNames: Record<string, string> = {
   tableau: "Tableau",
