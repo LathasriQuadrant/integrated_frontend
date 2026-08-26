@@ -918,6 +918,10 @@ export default function PowerBIReport() {
                 displayState: { mode: models.VisualContainerDisplayMode.Visible },
               });
 
+              await sleep(200);
+
+              await bindVisualFields(visual, v, knownGoodTables, getFallbackOrder);
+
               if (v.title) {
                 try {
                   await visual.setProperty({ objectName: "title", propertyName: "titleText" }, { value: v.title });
@@ -934,9 +938,7 @@ export default function PowerBIReport() {
                   console.warn(`⚠️ categoryLabel hide failed for "${v.title}":`, e?.message || e);
                 }
               }
-              await sleep(200);
-
-              await bindVisualFields(visual, v, knownGoodTables, getFallbackOrder);
+              
               await applyVisualFilters(visual, v);
               await applyVisualProperties(visual, v);
             } catch (e: any) {
@@ -1057,6 +1059,10 @@ export default function PowerBIReport() {
                 displayState: { mode: models.VisualContainerDisplayMode.Visible },
               });
 
+              await sleep(200);
+
+              await bindVisualFields(visual, v, knownGoodTables, getFallbackOrder);
+
               if (v.title) {
                 try {
                   await visual.setProperty({ objectName: "title", propertyName: "titleText" }, { value: v.title });
@@ -1074,9 +1080,7 @@ export default function PowerBIReport() {
                   console.warn(`⚠️ categoryLabel hide failed for "${v.title}":`, e?.message || e);
                 }
               }
-              await sleep(200);
-
-              await bindVisualFields(visual, v, knownGoodTables, getFallbackOrder);
+              
               await applyVisualFilters(visual, v);
               await applyVisualProperties(visual, v);
             } catch (e: any) {
