@@ -926,6 +926,13 @@ export default function PowerBIReport() {
                   /* ignore */
                 }
               }
+              if (v.visualType === "card") {
+                try {
+                  await visual.setProperty({ objectName: "categoryLabel", propertyName: "show" }, { value: false });
+                } catch (e) {
+                  console.warn(`⚠️ categoryLabel hide failed for "${v.title}":`, e?.message || e);
+                }
+              }
               await sleep(200);
 
               await bindVisualFields(visual, v, knownGoodTables, getFallbackOrder);
@@ -1055,6 +1062,14 @@ export default function PowerBIReport() {
                   await visual.setProperty({ objectName: "title", propertyName: "visible" }, { value: true });
                 } catch (e) {
                   /* ignore */
+                }
+              }
+
+              if (v.visualType === "card") {
+                try {
+                  await visual.setProperty({ objectName: "categoryLabel", propertyName: "show" }, { value: false });
+                } catch (e) {
+                  console.warn(`⚠️ categoryLabel hide failed for "${v.title}":`, e?.message || e);
                 }
               }
               await sleep(200);
