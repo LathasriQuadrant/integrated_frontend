@@ -922,6 +922,7 @@ export default function PowerBIReport() {
                 try {
                   await visual.setProperty({ objectName: "title", propertyName: "titleText" }, { value: v.title });
                   await visual.setProperty({ objectName: "title", propertyName: "visible" }, { value: true });
+                  await visual.setProperty({ objectName: "title", propertyName: "alignment" }, { value: "center" });
                 } catch (e) {
                   /* ignore */
                 }
@@ -1060,6 +1061,7 @@ export default function PowerBIReport() {
                 try {
                   await visual.setProperty({ objectName: "title", propertyName: "titleText" }, { value: v.title });
                   await visual.setProperty({ objectName: "title", propertyName: "visible" }, { value: true });
+                  await visual.setProperty({ objectName: "title", propertyName: "alignment" }, { value: "center" });
                 } catch (e) {
                   /* ignore */
                 }
