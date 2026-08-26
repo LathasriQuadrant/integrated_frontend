@@ -929,7 +929,7 @@ export default function PowerBIReport() {
               }
               if (v.visualType === "card") {
                 try {
-                  await visual.setProperty({ objectName: "categoryLabel", propertyName: "show" }, { value: false });
+                  await visual.setProperty({ objectName: "categoryLabels", propertyName: "show" }, { value: false });
                 } catch (e) {
                   console.warn(`⚠️ categoryLabel hide failed for "${v.title}":`, e?.message || e);
                 }
@@ -1069,7 +1069,7 @@ export default function PowerBIReport() {
 
               if (v.visualType === "card") {
                 try {
-                  await visual.setProperty({ objectName: "categoryLabel", propertyName: "show" }, { value: false });
+                  await visual.setProperty({ objectName: "categoryLabels", propertyName: "show" }, { value: false });
                 } catch (e) {
                   console.warn(`⚠️ categoryLabel hide failed for "${v.title}":`, e?.message || e);
                 }
