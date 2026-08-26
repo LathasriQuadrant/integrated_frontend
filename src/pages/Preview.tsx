@@ -920,7 +920,7 @@ export default function PowerBIReport() {
 
               if (v.title) {
                 try {
-                  await visual.setProperty({ objectName: "title", propertyName: "text" }, { value: v.title });
+                  await visual.setProperty({ objectName: "title", propertyName: "titleText" }, { value: v.title });
                   await visual.setProperty({ objectName: "title", propertyName: "visible" }, { value: true });
                 } catch (e) {
                   /* ignore */
@@ -1051,7 +1051,7 @@ export default function PowerBIReport() {
 
               if (v.title) {
                 try {
-                  await visual.setProperty({ objectName: "title", propertyName: "text" }, { value: v.title });
+                  await visual.setProperty({ objectName: "title", propertyName: "titleText" }, { value: v.title });
                   await visual.setProperty({ objectName: "title", propertyName: "visible" }, { value: true });
                 } catch (e) {
                   /* ignore */
