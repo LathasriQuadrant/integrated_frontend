@@ -14,6 +14,7 @@
 // interface TableEntry {
 //   name?: string;
 //   table?: string;
+//   columns?: string[];
 // }
 
 // interface DataModelDiagramProps {
@@ -70,6 +71,15 @@
 //       ),
 //     [nodeNames, relationships],
 //   );
+
+//   const tableColumns = useMemo(() => {
+//     const map = new Map<string, string[]>();
+//     tables.forEach((t) => {
+//       const label = tableLabel(t);
+//       if (label) map.set(label, t.columns ?? []);
+//     });
+//     return map;
+//   }, [tables]);
 
 //   const columns = Math.max(1, Math.ceil(Math.sqrt(nodeNames.length || 1)));
 
@@ -185,9 +195,11 @@
 //               ? "hsl(var(--powerbi-foreground))"
 //               : "hsl(var(--primary))";
 //           const kindLabel = isFact ? "FACT" : "TABLE";
+//           const cols = tableColumns.get(name) ?? [];
+//           const tooltipText = cols.length ? `${name}\n\nColumns:\n${cols.join("\n")}` : name;
 //           return (
 //             <g key={name} transform={`translate(${pos.x - NODE_WIDTH / 2}, ${pos.y - NODE_HEIGHT / 2})`}>
-//               <title>{name}</title>
+//               <title>{tooltipText}</title>
 //               <rect
 //                 width={NODE_WIDTH}
 //                 height={NODE_HEIGHT}
@@ -222,6 +234,7 @@
 import { useMemo } from "react";
 import { classifySchema, SchemaShape } from "@/lib/Schemaclassifier";
 import RationaleTooltip from "./Rationaletooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface RelationshipEntry {
   left_table?: string;
@@ -270,6 +283,67 @@ const shapeToneClasses: Record<SchemaShape, string> = {
   not_available: "bg-muted text-muted-foreground border-border",
 };
 
+type Point = { x: number; y: number };
+type RC = { row: number; col: number };
+
+/** Builds an orthogonal path that travels through the empty gutter between
+ * rows/columns instead of cutting straight through intervening nodes, plus
+ * a label position guaranteed to sit in that empty gutter rather than on
+ * top of an unrelated node.
+ *
+ * Note: this is a heuristic tuned for this grid layout (1 row/column apart
+ * is the common case for star/snowflake schemas). In a dense grid a path
+ * could still clip a node that happens to sit exactly in the routed
+ * gutter — for much larger/denser diagrams, a real obstacle-avoiding
+ * layout library (e.g. elkjs, dagre) would be a more robust next step.
+ */
+function routeRelationship(from: Point, to: Point, fromRC: RC, toRC: RC): { path: string; label: Point } {
+  const halfW = NODE_WIDTH / 2;
+  const halfH = NODE_HEIGHT / 2;
+
+  // Same row: dip into the row's bottom gutter and come back up.
+  if (fromRC.row === toRC.row) {
+    const midY = from.y + halfH + V_GAP / 2;
+    const pts: Point[] = [
+      { x: from.x, y: from.y + halfH },
+      { x: from.x, y: midY },
+      { x: to.x, y: midY },
+      { x: to.x, y: to.y + halfH },
+    ];
+    return { path: toPath(pts), label: { x: (from.x + to.x) / 2, y: midY } };
+  }
+
+  // Same column: dip into the column's right gutter and come back.
+  if (fromRC.col === toRC.col) {
+    const midX = from.x + halfW + H_GAP / 2;
+    const pts: Point[] = [
+      { x: from.x + halfW, y: from.y },
+      { x: midX, y: from.y },
+      { x: midX, y: to.y },
+      { x: to.x + halfW, y: to.y },
+    ];
+    return { path: toPath(pts), label: { x: midX, y: (from.y + to.y) / 2 } };
+  }
+
+  // Diagonal: exit toward target's row through the gutter, jog horizontally
+  // at that gutter level (empty space), then drop into the target.
+  const goingDown = toRC.row > fromRC.row;
+  const exitY = goingDown ? from.y + halfH : from.y - halfH;
+  const corridorY = goingDown ? exitY + V_GAP / 2 : exitY - V_GAP / 2;
+  const enterY = goingDown ? to.y - halfH : to.y + halfH;
+  const pts: Point[] = [
+    { x: from.x, y: exitY },
+    { x: from.x, y: corridorY },
+    { x: to.x, y: corridorY },
+    { x: to.x, y: enterY },
+  ];
+  return { path: toPath(pts), label: { x: (from.x + to.x) / 2, y: corridorY } };
+}
+
+function toPath(points: Point[]): string {
+  return points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
+}
+
 const DataModelDiagram = ({ tables, relationships, sharedTableNames }: DataModelDiagramProps) => {
   const nodeNames = useMemo(() => {
     const names = new Set<string>();
@@ -304,17 +378,19 @@ const DataModelDiagram = ({ tables, relationships, sharedTableNames }: DataModel
 
   const columns = Math.max(1, Math.ceil(Math.sqrt(nodeNames.length || 1)));
 
-  const positions = useMemo(() => {
-    const map = new Map<string, { x: number; y: number }>();
+  const { positions, gridIndex } = useMemo(() => {
+    const posMap = new Map<string, Point>();
+    const rcMap = new Map<string, RC>();
     nodeNames.forEach((name, i) => {
       const col = i % columns;
       const row = Math.floor(i / columns);
-      map.set(name, {
+      rcMap.set(name, { row, col });
+      posMap.set(name, {
         x: col * (NODE_WIDTH + H_GAP) + NODE_WIDTH / 2 + PADDING,
         y: row * (NODE_HEIGHT + V_GAP) + NODE_HEIGHT / 2 + PADDING,
       });
     });
-    return map;
+    return { positions: posMap, gridIndex: rcMap };
   }, [nodeNames, columns]);
 
   if (nodeNames.length === 0) {
@@ -328,7 +404,7 @@ const DataModelDiagram = ({ tables, relationships, sharedTableNames }: DataModel
   const hasFactTables = classification.factTables.size > 0;
 
   return (
-    <div className="border border-border rounded-lg bg-muted/20 overflow-auto">
+    <div className="relative border border-border rounded-lg bg-muted/20 overflow-auto">
       {/* Header: schema-shape badge always shown, legend rows only when relevant */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-3 py-2 border-b border-border text-[11px] text-muted-foreground">
         <span className="flex items-center gap-1.5">
@@ -350,102 +426,140 @@ const DataModelDiagram = ({ tables, relationships, sharedTableNames }: DataModel
           </span>
         )}
       </div>
-      <svg width={width} height={height} className="block min-w-full">
-        {/* Relationship lines, drawn first so nodes sit on top */}
-        {relationships.map((r, i) => {
-          const from = r.left_table ? positions.get(r.left_table) : undefined;
-          const to = r.right_table ? positions.get(r.right_table) : undefined;
-          if (!from || !to || from === to) return null;
-          const midX = (from.x + to.x) / 2;
-          const midY = (from.y + to.y) / 2;
-          const typeLabel = r.type || r.operator;
-          const columnLabel = r.left_column && r.right_column ? `${r.left_column} = ${r.right_column}` : "";
 
-          return (
-            <g key={i}>
-              <line
-                x1={from.x}
-                y1={from.y}
-                x2={to.x}
-                y2={to.y}
-                stroke="hsl(var(--border))"
-                strokeWidth={1.5}
-              />
-              <circle cx={from.x} cy={from.y} r={3} fill="hsl(var(--primary))" />
-              <circle cx={to.x} cy={to.y} r={3} fill="hsl(var(--primary))" />
-              <g transform={`translate(${midX}, ${midY})`}>
+      {/* Positioning context shared by the SVG and the overlay buttons below,
+          so overlay coordinates line up 1:1 with SVG node coordinates. */}
+      <div className="relative" style={{ width, height }}>
+        <svg width={width} height={height} className="block absolute top-0 left-0">
+          {/* Relationship lines, drawn first so nodes sit on top */}
+          {relationships.map((r, i) => {
+            const from = r.left_table ? positions.get(r.left_table) : undefined;
+            const to = r.right_table ? positions.get(r.right_table) : undefined;
+            const fromRC = r.left_table ? gridIndex.get(r.left_table) : undefined;
+            const toRC = r.right_table ? gridIndex.get(r.right_table) : undefined;
+            if (!from || !to || !fromRC || !toRC || from === to) return null;
+
+            const { path, label } = routeRelationship(from, to, fromRC, toRC);
+            const typeLabel = r.type || r.operator;
+            const columnLabel = r.left_column && r.right_column ? `${r.left_column} = ${r.right_column}` : "";
+
+            return (
+              <g key={i}>
+                <path d={path} fill="none" stroke="hsl(var(--border))" strokeWidth={1.5} />
+                <circle cx={from.x} cy={from.y + NODE_HEIGHT / 2} r={3} fill="hsl(var(--primary))" />
+                <circle cx={to.x} cy={to.y - NODE_HEIGHT / 2} r={3} fill="hsl(var(--primary))" />
+                <g transform={`translate(${label.x}, ${label.y})`}>
+                  <rect
+                    x={-52}
+                    y={columnLabel ? -18 : -9}
+                    width={104}
+                    height={columnLabel ? 36 : 18}
+                    rx={4}
+                    fill="hsl(var(--card))"
+                    stroke="hsl(var(--border))"
+                  />
+                  {typeLabel && (
+                    <text textAnchor="middle" dy={columnLabel ? -4 : 4} fontSize={9} fontWeight={600} fill="hsl(var(--muted-foreground))">
+                      {typeLabel.length > 16 ? `${typeLabel.slice(0, 15)}…` : typeLabel}
+                    </text>
+                  )}
+                  {columnLabel && (
+                    <text textAnchor="middle" dy={11} fontSize={8.5} fontFamily="monospace" fill="hsl(var(--primary))">
+                      {columnLabel.length > 22 ? `${columnLabel.slice(0, 21)}…` : columnLabel}
+                    </text>
+                  )}
+                </g>
+              </g>
+            );
+          })}
+
+          {/* Table node visuals only — hover/focus lives on the DOM overlay
+              buttons below so we can use the real Tooltip component. */}
+          {nodeNames.map((name) => {
+            const pos = positions.get(name)!;
+            const truncated = name.length > 22 ? `${name.slice(0, 21)}…` : name;
+            const isShared = sharedTableNames?.has(name);
+            const isFact = classification.factTables.has(name);
+            const accent = isFact ? "hsl(var(--warning))" : isShared ? "hsl(var(--powerbi))" : "hsl(var(--primary))";
+            const headerFill = isFact
+              ? "hsl(var(--warning) / 0.18)"
+              : isShared
+                ? "hsl(var(--powerbi) / 0.18)"
+                : "hsl(var(--primary) / 0.12)";
+            const headerText = isFact
+              ? "hsl(var(--warning))"
+              : isShared
+                ? "hsl(var(--powerbi-foreground))"
+                : "hsl(var(--primary))";
+            const kindLabel = isFact ? "FACT" : "TABLE";
+
+            return (
+              <g key={name} transform={`translate(${pos.x - NODE_WIDTH / 2}, ${pos.y - NODE_HEIGHT / 2})`}>
                 <rect
-                  x={-52}
-                  y={columnLabel ? -18 : -9}
-                  width={104}
-                  height={columnLabel ? 36 : 18}
-                  rx={4}
+                  width={NODE_WIDTH}
+                  height={NODE_HEIGHT}
+                  rx={6}
                   fill="hsl(var(--card))"
-                  stroke="hsl(var(--border))"
+                  stroke={accent}
+                  strokeWidth={isFact ? 1.75 : 1.25}
                 />
-                {typeLabel && (
-                  <text textAnchor="middle" dy={columnLabel ? -4 : 4} fontSize={9} fontWeight={600} fill="hsl(var(--muted-foreground))">
-                    {typeLabel.length > 16 ? `${typeLabel.slice(0, 15)}…` : typeLabel}
-                  </text>
-                )}
-                {columnLabel && (
-                  <text textAnchor="middle" dy={11} fontSize={8.5} fontFamily="monospace" fill="hsl(var(--primary))">
-                    {columnLabel.length > 22 ? `${columnLabel.slice(0, 21)}…` : columnLabel}
-                  </text>
+                <rect width={NODE_WIDTH} height={16} rx={6} fill={headerFill} />
+                <rect y={10} width={NODE_WIDTH} height={6} fill={headerFill} />
+                <text x={10} y={11} fontSize={8} fontWeight={600} letterSpacing={0.5} fill={headerText}>
+                  {kindLabel}
+                </text>
+                <text x={10} y={33} fontSize={11.5} fontWeight={500} fill="hsl(var(--foreground))">
+                  {truncated}
+                </text>
+                {/* Shared-across-workbooks marker — independent of fact/dimension
+                    styling, so a table can read as both at once. */}
+                {isShared && (
+                  <circle cx={NODE_WIDTH - 8} cy={8} r={3.5} fill="hsl(var(--powerbi))" stroke="hsl(var(--card))" strokeWidth={1} />
                 )}
               </g>
-            </g>
-          );
-        })}
+            );
+          })}
+        </svg>
 
-        {/* Table nodes */}
+        {/* Invisible DOM overlay buttons, one per node, positioned to exactly
+            cover the matching SVG rect. A real Tooltip component needs a
+            real DOM ref, which an SVG <g> can't reliably provide Radix. */}
         {nodeNames.map((name) => {
           const pos = positions.get(name)!;
-          const truncated = name.length > 22 ? `${name.slice(0, 21)}…` : name;
-          const isShared = sharedTableNames?.has(name);
-          const isFact = classification.factTables.has(name);
-          const accent = isFact ? "hsl(var(--warning))" : isShared ? "hsl(var(--powerbi))" : "hsl(var(--primary))";
-          const headerFill = isFact
-            ? "hsl(var(--warning) / 0.18)"
-            : isShared
-              ? "hsl(var(--powerbi) / 0.18)"
-              : "hsl(var(--primary) / 0.12)";
-          const headerText = isFact
-            ? "hsl(var(--warning))"
-            : isShared
-              ? "hsl(var(--powerbi-foreground))"
-              : "hsl(var(--primary))";
-          const kindLabel = isFact ? "FACT" : "TABLE";
           const cols = tableColumns.get(name) ?? [];
-          const tooltipText = cols.length ? `${name}\n\nColumns:\n${cols.join("\n")}` : name;
           return (
-            <g key={name} transform={`translate(${pos.x - NODE_WIDTH / 2}, ${pos.y - NODE_HEIGHT / 2})`}>
-              <title>{tooltipText}</title>
-              <rect
-                width={NODE_WIDTH}
-                height={NODE_HEIGHT}
-                rx={6}
-                fill="hsl(var(--card))"
-                stroke={accent}
-                strokeWidth={isFact ? 1.75 : 1.25}
-              />
-              <rect width={NODE_WIDTH} height={16} rx={6} fill={headerFill} />
-              <rect y={10} width={NODE_WIDTH} height={6} fill={headerFill} />
-              <text x={10} y={11} fontSize={8} fontWeight={600} letterSpacing={0.5} fill={headerText}>
-                {kindLabel}
-              </text>
-              <text x={10} y={33} fontSize={11.5} fontWeight={500} fill="hsl(var(--foreground))">
-                {truncated}
-              </text>
-              {/* Shared-across-workbooks marker — independent of fact/dimension
-                  styling, so a table can read as both at once. */}
-              {isShared && (
-                <circle cx={NODE_WIDTH - 8} cy={8} r={3.5} fill="hsl(var(--powerbi))" stroke="hsl(var(--card))" strokeWidth={1} />
-              )}
-            </g>
+            <Tooltip key={name} delayDuration={150}>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  aria-label={`${name} columns`}
+                  className="absolute bg-transparent border-0 p-0 cursor-default"
+                  style={{
+                    left: pos.x - NODE_WIDTH / 2,
+                    top: pos.y - NODE_HEIGHT / 2,
+                    width: NODE_WIDTH,
+                    height: NODE_HEIGHT,
+                  }}
+                />
+              </TooltipTrigger>
+              <TooltipContent side="top" align="center" className="max-w-xs text-xs leading-relaxed">
+                <p className="font-semibold mb-1">{name}</p>
+                {cols.length ? (
+                  <ul className="space-y-0.5">
+                    {cols.map((col) => (
+                      <li key={col} className="font-mono text-[11px]">
+                        {col}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="italic text-muted-foreground">No column info</p>
+                )}
+              </TooltipContent>
+            </Tooltip>
           );
         })}
-      </svg>
+      </div>
     </div>
   );
 };
