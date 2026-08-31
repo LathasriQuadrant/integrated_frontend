@@ -1180,7 +1180,7 @@ const PreMigrationAnalysis = () => {
                       <InsightCard
                         key={i}
                         title={s.datasource}
-                        meta={`Used by ${s.used_by_report_count} report${s.used_by_report_count === 1 ? "" : "s"}`}
+                        meta={`Used by ${s.used_by_report_count} view${s.used_by_report_count === 1 ? "" : "s"}`}
                         chips={s.used_by_reports}
                         icon={<Database />}
                         onJumpToWorkbook={jumpToWorkbook}
