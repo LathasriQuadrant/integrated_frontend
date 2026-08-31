@@ -72,4 +72,4 @@ export async function analyzeWorkbooks(
   return (await response.json()) as FullAnalysisResponse;
 }
 
-export const analysisApi = { analyzeWorkbooks };
+export const analysisApi = { analyzeWorkbooks }; 
