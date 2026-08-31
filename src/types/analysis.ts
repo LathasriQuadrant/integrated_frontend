@@ -152,11 +152,19 @@ export interface UsageAnalysisResult {
 // meaningfully (e.g. distinguishing group_name from a list of KPI names)
 // rather than dumping every key as an undifferentiated text block.
 
-export interface KpiGroup {
-  group_name: string;
-  kpis: string[];
-  reason: string;
-}
+// export interface KpiGroup {
+//   group_name: string;
+//   kpis: string[];
+//   reason: string;
+// }
+ export interface KpiGroup {
+   group_name: string;
+   kpis: string[];
+   reason: string;
+   recommended_keep: string;
+   recommended_remove: string[];
+   recommendation_rationale: string;
+ }
 
 export interface KpiCluster {
   cluster_name: string;
