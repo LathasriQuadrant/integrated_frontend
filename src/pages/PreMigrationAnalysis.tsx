@@ -697,7 +697,8 @@ import {
   ListFilter as ListFilterIcon,
 } from "lucide-react";
 
-const TABLEAU_BACKEND_URL = import.meta.env.VITE_TABLEAU_BACKEND_URL || "http://localhost:8000";
+// const TABLEAU_BACKEND_URL = import.meta.env.VITE_TABLEAU_BACKEND_URL || "http://localhost:8000";
+const TABLEAU_BACKEND_URL = "https://frame-premigration-test-cabfgrazgacqgzf9.eastus-01.azurewebsites.net";
 
 interface NavState {
   workbookIds: string[];
