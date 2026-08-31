@@ -45,7 +45,7 @@
 //   ListFilter as ListFilterIcon,
 // } from "lucide-react";
 
-// const TABLEAU_BACKEND_URL = import.meta.env.VITE_TABLEAU_BACKEND_URL || "http://localhost:8000";
+// const TABLEAU_BACKEND_URL = "https://frame-premigration-test-cabfgrazgacqgzf9.eastus-01.azurewebsites.net";
 
 // interface NavState {
 //   workbookIds: string[];
@@ -442,7 +442,7 @@
 //             <div className="flex items-center justify-between mb-3">
 //               <div className="flex items-center gap-1">
 //                 <h2 className="text-sm font-semibold">
-//                   {isMulti ? activeWorkbook.workbook_metadata.name : "Workbook Details"}
+//                   {activeWorkbook.workbook_metadata.name || "Workbook Details"}
 //                 </h2>
 //                 <WorkbookInfoPopover meta={activeWorkbook.workbook_metadata} />
 //               </div>
@@ -697,7 +697,7 @@ import {
   ListFilter as ListFilterIcon,
 } from "lucide-react";
 
-const TABLEAU_BACKEND_URL = "https://frame-premigration-test-cabfgrazgacqgzf9.eastus-01.azurewebsites.net";
+const TABLEAU_BACKEND_URL = import.meta.env.VITE_TABLEAU_BACKEND_URL || "http://localhost:8000";
 
 interface NavState {
   workbookIds: string[];
@@ -1140,12 +1140,25 @@ const PreMigrationAnalysis = () => {
                         detail={g.reason}
                         icon={<Copy />}
                         tone="warning"
+                        recommendedKeep={g.recommended_keep}
+                        recommendedRemove={g.recommended_remove}
+                        recommendationRationale={g.recommendation_rationale}
                       />
                     ))}
                   </InsightGroup>
                   <InsightGroup title="Similar KPIs" icon={<GitBranch />} tone="default" count={result.kpi_analysis.similar_kpis.length}>
                     {result.kpi_analysis.similar_kpis.map((g, i) => (
-                      <InsightCard key={i} title={g.group_name} meta={`${g.kpis.length} KPIs`} chips={g.kpis} detail={g.reason} icon={<GitBranch />} />
+                      <InsightCard
+                        key={i}
+                        title={g.group_name}
+                        meta={`${g.kpis.length} KPIs`}
+                        chips={g.kpis}
+                        detail={g.reason}
+                        icon={<GitBranch />}
+                        recommendedKeep={g.recommended_keep}
+                        recommendedRemove={g.recommended_remove}
+                        recommendationRationale={g.recommendation_rationale}
+                      />
                     ))}
                   </InsightGroup>
                   <InsightGroup title="KPI Clusters" icon={<Layers />} tone="default" count={result.kpi_analysis.kpi_clusters.length}>
