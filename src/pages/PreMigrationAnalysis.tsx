@@ -1098,14 +1098,21 @@ const PreMigrationAnalysis = () => {
                 </h2>
                 <WorkbookInfoPopover meta={activeWorkbook.workbook_metadata} />
               </div>
-              <Button size="sm" onClick={handleMigrateToPowerBI} disabled={isPreparingMigration}>
-                {isPreparingMigration ? (
-                  <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
-                ) : (
-                  <ArrowUpRight className="w-3.5 h-3.5 mr-2" />
-                )}
-                Migrate to Power BI
-              </Button>
+             <div className="flex items-center gap-2">
+                  <Button size="sm" disabled={isPreparingMigration}>
+                
+                    Migrate With Suggestions
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    onClick={handleMigrateToPowerBI}
+                    disabled={isPreparingMigration}
+                  >
+                    
+                    Migrate Without Suggestions
+                  </Button>
+                </div>
             </div>
             <WorkbookAnalysisPanel
               bundle={activeWorkbook}
