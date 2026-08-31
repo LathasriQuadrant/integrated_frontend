@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import {
   Accordion,
   AccordionContent,
@@ -60,11 +61,49 @@ const SectionLabel = ({ children }: { children: React.ReactNode }) => (
 );
 
 const WorkbookAnalysisPanel = ({ bundle, usage, complexity, sharedTableNames }: WorkbookAnalysisPanelProps) => {
+  /** Merge duplicate table entries into one row per table.
+   *
+   * `bundle.data_model.tables` can contain more than one object for the
+   * same physical table when the backend runs multiple analysis passes
+   * over a workbook (e.g. a "structure" pass that records `table` +
+   * `datasource`, and a separate "schema" pass that records `table` +
+   * `columns`) and appends each result instead of upserting into a
+   * single record. Left unmerged, the UI renders the same table name
+   * twice — once with a datasource and no columns, once with columns and
+   * no datasource.
+   *
+   * This merges by table name (case-insensitive) and combines fields
+   * from every entry seen, preferring the earliest non-empty value found
+   * for group-level fields and always keeping non-empty `columns`. */
+  const mergedTables = useMemo(() => {
+    const map = new Map<string, any>();
+    (bundle.data_model?.tables ?? []).forEach((t: any) => {
+      const key = (t.name || t.table || "").trim().toLowerCase();
+      if (!key) return;
+      const existing = map.get(key);
+      if (!existing) {
+        map.set(key, t);
+        return;
+      }
+      map.set(key, {
+        ...existing,
+        ...t,
+        // Never let a later, columns-less pass wipe out columns we
+        // already found, and vice versa.
+        columns: (t.columns?.length ? t.columns : existing.columns) ?? [],
+        datasource: t.datasource || existing.datasource,
+        name: existing.name || t.name,
+        table: existing.table || t.table,
+      });
+    });
+    return Array.from(map.values());
+  }, [bundle.data_model?.tables]);
+
   const structure = {
     dashboards: bundle.components?.dashboards?.length ?? bundle.reports?.dashboards?.length ?? 0,
     worksheets: bundle.components?.worksheets?.length ?? bundle.reports?.worksheets?.length ?? 0,
     datasources: bundle.data_model?.datasources?.length ?? 0,
-    tables: bundle.data_model?.tables?.length ?? 0,
+    tables: mergedTables.length,
     calculatedFields: bundle.fields?.calculated_fields?.length ?? 0,
     kpis: bundle.kpis?.length ?? 0,
     parameters: bundle.components?.parameters?.length ?? 0,
@@ -72,7 +111,7 @@ const WorkbookAnalysisPanel = ({ bundle, usage, complexity, sharedTableNames }: 
   };
 
   const structureMax = Math.max(structure.dashboards, structure.datasources, structure.calculatedFields, structure.kpis, 1);
-  const sharedCount = bundle.data_model?.tables?.filter((t: any) => {
+  const sharedCount = mergedTables.filter((t: any) => {
     const label = (t.name || t.table || "").trim();
     return label && sharedTableNames?.has(label);
   }).length ?? 0;
@@ -226,7 +265,7 @@ const WorkbookAnalysisPanel = ({ bundle, usage, complexity, sharedTableNames }: 
               <Table2 className="w-4 h-4 text-muted-foreground" />
               Shared Data Model
               <span className="text-xs font-normal text-muted-foreground">
-                ({bundle.data_model?.tables?.length ?? 0} tables{sharedCount > 0 ? `, ${sharedCount} shared` : ""})
+                ({mergedTables.length} tables{sharedCount > 0 ? `, ${sharedCount} shared` : ""})
               </span>
             </span>
           </AccordionTrigger>
@@ -240,9 +279,9 @@ const WorkbookAnalysisPanel = ({ bundle, usage, complexity, sharedTableNames }: 
             )}
             <div>
               <SectionLabel>Schema</SectionLabel>
-              {bundle.data_model?.tables?.length ? (
+              {mergedTables.length ? (
                 <DataModelDiagram
-                  tables={bundle.data_model?.tables ?? []}
+                  tables={mergedTables}
                   relationships={bundle.data_model?.relationships ?? []}
                   sharedTableNames={sharedTableNames}
                 />
@@ -253,7 +292,7 @@ const WorkbookAnalysisPanel = ({ bundle, usage, complexity, sharedTableNames }: 
 
             <div>
               <SectionLabel>Tables</SectionLabel>
-              {bundle.data_model?.tables?.length ? (
+              {mergedTables.length ? (
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -264,7 +303,7 @@ const WorkbookAnalysisPanel = ({ bundle, usage, complexity, sharedTableNames }: 
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {bundle.data_model.tables.map((t: any, i: number) => {
+                    {mergedTables.map((t: any, i: number) => {
                       const label = displayName(t, "Unnamed table");
                       const isShared = sharedTableNames?.has((t.name || t.table || "").trim());
                       const cols: string[] = Array.isArray(t.columns) ? t.columns : [];
