@@ -1,4 +1,4 @@
-import { AnalyzeRequest, FullAnalysisResponse } from "@/types/analysis";
+import { AnalyzeRequest, FullAnalysisResponse } from "@/types/analysis"; 
 
 // Same integrated backend as the existing /tableau routes.
 // Override with VITE_TABLEAU_BACKEND_URL for a non-local deployment.
