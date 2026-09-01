@@ -426,6 +426,7 @@ const DestinationWorkspaceSelection = () => {
         SheetsCount: childCount,
         DashboardsCount: childCount,
         WorkbooksCount: 1,
+        WorkspaceId: selectedWorkspace.id,   // ← new
       };
 
       const jobRes = await fetch("https://databasemanagement-e0e0d7bqhdg3gec7.eastus-01.azurewebsites.net/jobs/", {
