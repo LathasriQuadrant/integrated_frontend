@@ -1154,7 +1154,7 @@ const PreMigrationAnalysis = () => {
                       />
                     ))}
                   </InsightGroup>
-                  <InsightGroup title="Similar KPIs" icon={<GitBranch />} tone="default" count={result.kpi_analysis.similar_kpis.length}>
+                  {/* <InsightGroup title="Similar KPIs" icon={<GitBranch />} tone="default" count={result.kpi_analysis.similar_kpis.length}>
                     {result.kpi_analysis.similar_kpis.map((g, i) => (
                       <InsightCard
                         key={i}
@@ -1166,6 +1166,18 @@ const PreMigrationAnalysis = () => {
                         recommendedKeep={g.recommended_keep}
                         recommendedRemove={g.recommended_remove}
                         recommendationRationale={g.recommendation_rationale}
+                      />
+                    ))}
+                  </InsightGroup> */}
+                  <InsightGroup title="Similar KPIs" icon={<GitBranch />} tone="default" count={result.kpi_analysis.similar_kpis.length}>
+                    {result.kpi_analysis.similar_kpis.map((g, i) => (
+                      <InsightCard
+                        key={i}
+                        title={g.group_name}
+                        meta={`${g.kpis.length} KPIs`}
+                        chips={g.kpis}
+                        detail={[g.reason, g.advisory_note].filter(Boolean).join("\n\n")}
+                        icon={<GitBranch />}
                       />
                     ))}
                   </InsightGroup>
