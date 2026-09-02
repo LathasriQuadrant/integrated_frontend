@@ -161,6 +161,7 @@ export interface UsageAnalysisResult {
    group_name: string;
    kpis: string[];
    reason: string;
+   advisory_note?: string;
    recommended_keep: string;
    recommended_remove: string[];
    recommendation_rationale: string;
