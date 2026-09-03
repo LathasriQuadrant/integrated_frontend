@@ -2063,6 +2063,11 @@ export default function PowerBIReport() {
     return { columns, rows, cellWidth, cellHeight, canvasWidth, canvasHeight };
   }
 
+  // 🔁 CHANGED: bindVisualFields now pauses briefly (120ms) after every
+  // single field bind (measure or column), instead of binding all of a
+  // visual's fields back-to-back with zero delay. This spreads out the
+  // DAX queries each addDataField call triggers, reducing the odds of
+  // bursting past the semantic model's concurrent-query throughput.
   async function bindVisualFields(
     visual: any,
     v: ApiVisual,
@@ -2096,6 +2101,8 @@ export default function PowerBIReport() {
           } catch (e: any) {
             console.warn(`⚠️ Measure binding failed for ${measureTable}.${b.measure} → ${technicalRole}:`, e?.message || e);
           }
+          // 🆕 NEW: pause after every field bind, measure or column.
+          await sleep(120);
           continue;
         }
 
@@ -2151,6 +2158,9 @@ export default function PowerBIReport() {
             `❌ FAILED to bind column "${sanitizedCol}" (original: "${rawCol}") to any table. Tried: [${b.table}, ${getFallbackOrder(b.table).join(", ")}]`,
           );
         }
+
+        // 🆕 NEW: pause after every column bind too.
+        await sleep(120);
       }
     }
   }
@@ -2346,7 +2356,13 @@ export default function PowerBIReport() {
             console.warn(`⚠️ Failed to resize ${expectedPageName} to ${canvasWidth}x${canvasHeight}:`, e);
           }
 
-          for (const v of pageData.visuals || []) {
+          // 🔁 CHANGED: was `for (const v of pageData.visuals || [])` with a
+          // flat `await sleep(200)` after createVisual. Now indexed so the
+          // pause can grow per visual, staggering the DAX queries each
+          // visual's creation/binding triggers instead of bursting them.
+          const visualsForPage = pageData.visuals || [];
+          for (let vIdx = 0; vIdx < visualsForPage.length; vIdx++) {
+            const v = visualsForPage[vIdx];
             const layout = normalizeApiLayout(v.layout);
 
             setStatus(`Creating ${v.visualType} on ${expectedPageName}...`);
@@ -2360,7 +2376,10 @@ export default function PowerBIReport() {
                 displayState: { mode: models.VisualContainerDisplayMode.Visible },
               });
 
-              await sleep(200);
+              // 🔁 CHANGED: was `await sleep(200)`. Now grows with vIdx so
+              // later visuals on a busy page wait a little longer before
+              // their fields get bound, reducing query-throughput bursts.
+              await sleep(400 + vIdx * 100);
 
               await bindVisualFields(visual, v, knownGoodTables, getFallbackOrder);
 
@@ -2492,7 +2511,10 @@ export default function PowerBIReport() {
                 displayState: { mode: models.VisualContainerDisplayMode.Visible },
               });
 
-              await sleep(200);
+              // 🔁 CHANGED: was `await sleep(200)`. Now grows with
+              // visualIndex (already incremented above), same staggering
+              // rationale as the apiPages branch.
+              await sleep(400 + visualIndex * 100);
 
               await bindVisualFields(visual, v, knownGoodTables, getFallbackOrder);
 
@@ -2641,8 +2663,11 @@ export default function PowerBIReport() {
             createStaticVisuals(report);
           });
 
+          // 🔁 CHANGED: one extra retry attempt (was 3, now 4), since this
+          // handler now also covers query-throughput retries, not just
+          // Lakehouse sync lag.
           let schemaDriftRetries = 0;
-          const MAX_SCHEMA_DRIFT_RETRIES = 3;
+          const MAX_SCHEMA_DRIFT_RETRIES = 4;
 
           report.on("error", (e: any) => {
             console.group("❌ DEBUG: Power BI Error Event");
@@ -2664,17 +2689,27 @@ export default function PowerBIReport() {
             console.groupEnd();
 
             const msg: string = e?.detail?.detailedMessage || e?.detail?.message || "";
-            const looksLikeLakehouseSyncLag = msg.includes("didn't match any rows") || msg.includes("ErrorCode = 10061");
 
-            if (looksLikeLakehouseSyncLag && schemaDriftRetries < MAX_SCHEMA_DRIFT_RETRIES) {
+            // 🔁 CHANGED: widened from only matching the Lakehouse-sync-lag
+            // wording to also match QueryUserError / "capacity or license
+            // issue" — the error actually being hit. Both are transient
+            // query failures where a retry a few seconds later can succeed,
+            // so both get the same backoff-and-refresh treatment.
+            const isTransientQueryError =
+              msg.includes("didn't match any rows") ||
+              msg.includes("ErrorCode = 10061") ||
+              msg.includes("QueryUserError") ||
+              msg.toLowerCase().includes("capacity or license issue");
+
+            if (isTransientQueryError && schemaDriftRetries < MAX_SCHEMA_DRIFT_RETRIES) {
               schemaDriftRetries += 1;
               setStatus(
-                `Underlying table not ready yet in the Lakehouse — retrying (${schemaDriftRetries}/${MAX_SCHEMA_DRIFT_RETRIES})...`,
+                `Query didn't complete yet — retrying (${schemaDriftRetries}/${MAX_SCHEMA_DRIFT_RETRIES})...`,
               );
               setStatusType("warning");
               setTimeout(() => {
-                report.refresh().catch((err: any) => console.warn("Schema-drift retry refresh failed:", err));
-              }, 5000 * schemaDriftRetries);
+                report.refresh().catch((err: any) => console.warn("Transient-error retry refresh failed:", err));
+              }, 5000 * schemaDriftRetries); // 5s, 10s, 15s, 20s backoff
               return;
             }
 
