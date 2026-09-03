@@ -820,7 +820,70 @@ const PreMigrationAnalysis = () => {
     return { most: sorted[0], least: sorted[sorted.length - 1] };
   }, [result]);
 
+  const buildSuggestionsPayload = () => {
+    const remap: Record<string, string> = {};
+    const remove: string[] = [];
+
+    for (const g of result?.kpi_analysis?.duplicate_kpis ?? []) {
+      const keep = (g.recommended_keep || "").trim();
+      for (const r of g.recommended_remove ?? []) {
+        const name = (r || "").trim();
+        if (keep && name && name !== keep) {
+          remap[name] = keep;
+          if (!remove.includes(name)) remove.push(name);
+        }
+      }
+    }
+
+    return {
+      enabled: remove.length > 0,
+      remap,
+      remove,
+    };
+  };
+
   // ---------------- Migrate to Power BI ----------------
+  // const handleMigrateToPowerBI = async () => {
+  //   if (!activeWorkbook) return;
+  //   const token = sessionStorage.getItem("tableau_api_token");
+  //   if (!token) {
+  //     toast({ title: "Session expired", description: "Please sign in again", variant: "destructive" });
+  //     navigate("/");
+  //     return;
+  //   }
+
+  //   setIsPreparingMigration(true);
+  //   try {
+  //     const dlRes = await fetch(`${TABLEAU_BACKEND_URL}/tableau/download_workbook`, {
+  //       method: "POST",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify({
+  //         api_token: token,
+  //         workbook_id: activeWorkbook.workbook_metadata.id,
+  //         file_name: `${activeWorkbook.workbook_metadata.name}.twbx`,
+  //       }),
+  //     });
+  //     if (!dlRes.ok) throw new Error("Failed to prepare workbook for migration");
+
+  //     const node: TreeNode = {
+  //       id: activeWorkbook.workbook_metadata.id,
+  //       name: activeWorkbook.workbook_metadata.name,
+  //       type: "workbook",
+  //     };
+  //     sessionStorage.setItem(
+  //       "selected_workbook",
+  //       JSON.stringify({ id: node.id, name: node.name, projectName: activeWorkbook.workbook_metadata.project }),
+  //     );
+
+  //     toast({ title: "Preparation complete", description: "Ready to select destination workspace" });
+  //     navigate("/workspace-selection", { state: { node, source: "tableau" } });
+  //   } catch (err) {
+  //     const message = err instanceof Error ? err.message : "Migration preparation failed";
+  //     toast({ title: "Migration failed", description: message, variant: "destructive" });
+  //   } finally {
+  //     setIsPreparingMigration(false);
+  //   }
+  // };
   const handleMigrateToPowerBI = async () => {
     if (!activeWorkbook) return;
     const token = sessionStorage.getItem("tableau_api_token");
@@ -850,7 +913,11 @@ const PreMigrationAnalysis = () => {
       };
       sessionStorage.setItem(
         "selected_workbook",
-        JSON.stringify({ id: node.id, name: node.name, projectName: activeWorkbook.workbook_metadata.project }),
+        JSON.stringify({
+          id: node.id,
+          name: node.name,
+          projectName: activeWorkbook.workbook_metadata.project,
+        }),
       );
 
       toast({ title: "Preparation complete", description: "Ready to select destination workspace" });
@@ -862,6 +929,25 @@ const PreMigrationAnalysis = () => {
       setIsPreparingMigration(false);
     }
   };
+
+  const handleMigrateWithSuggestions = async () => {
+    const payload = buildSuggestionsPayload();
+    sessionStorage.setItem("migration_suggestions", JSON.stringify(payload));
+    if (!payload.enabled) {
+      toast({
+        title: "No duplicate KPI suggestions",
+        description: "No keep/remove pairs found — migrating without measure changes.",
+      });
+    }
+    await handleMigrateToPowerBI();
+  };
+
+  const handleMigrateWithoutSuggestions = async () => {
+    sessionStorage.removeItem("migration_suggestions");
+    await handleMigrateToPowerBI();
+  };
+
+
 
   // ---------------- Loading ----------------
   if (isLoading) {
@@ -1099,7 +1185,7 @@ const PreMigrationAnalysis = () => {
                 </h2>
                 <WorkbookInfoPopover meta={activeWorkbook.workbook_metadata} />
               </div>
-             <div className="flex items-center gap-2">
+             {/* <div className="flex items-center gap-2">
                   <Button size="sm" disabled={isPreparingMigration}>
                 
                     Migrate With Suggestions
@@ -1113,7 +1199,31 @@ const PreMigrationAnalysis = () => {
                     
                     Migrate Without Suggestions
                   </Button>
-                </div>
+                </div> */}
+                              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  onClick={handleMigrateWithSuggestions}
+                  disabled={isPreparingMigration}
+                >
+                  {isPreparingMigration ? (
+                    <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
+                  ) : null}
+                  Migrate With Suggestions
+                </Button>
+
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleMigrateWithoutSuggestions}
+                  disabled={isPreparingMigration}
+                >
+                  {isPreparingMigration ? (
+                    <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
+                  ) : null}
+                  Migrate Without Suggestions
+                </Button>
+              </div>
             </div>
             <WorkbookAnalysisPanel
               bundle={activeWorkbook}

@@ -153,16 +153,316 @@ export default function Migration() {
     let reuseMode = false;
     let reuseDatasetId: string | null = null;
 
-    const run = async () => {
+    // const run = async () => {
+    //   let metaData: any = null;
+    //   let datasourceName = "";
+
+    //   // ── Step 1a – Metadata Extraction (moved first: needed for reuse detection) ──
+    //   updateStep(0, "running", "Extracting metadata…");
+    //   try {
+    //     const metaRes = await fetch(
+    //       `https://relationshipss-b3fbh7cehtfjghhr.eastus-01.azurewebsites.net/extract-metadata?folder_name=${encodeURIComponent(reportName)}`,
+    //       { method: "POST" },
+    //     );
+    //     if (!metaRes.ok) throw new Error(`Metadata extraction failed (${metaRes.status})`);
+    //     metaData = await metaRes.json();
+    //     console.log("Metadata extraction response:", metaData);
+    //     sessionStorage.setItem("metadata_response", JSON.stringify(metaData));
+    //     if (metaData.outputBlobUrl) {
+    //       sessionStorage.setItem("metadataOutputBlobUrl", metaData.outputBlobUrl);
+    //     }
+
+    //     // ASSUMPTION replaced with confirmed shape: datasourceName lives under metaData.metadata.datasourceName
+    //      datasourceName = metaData.metadata?.datasourceName || "";
+    //      if (datasourceName) {
+    //        sessionStorage.setItem("current_datasource_name", datasourceName);
+    //      }
+    //   } catch (err: any) {
+    //     log("Step 1 (extract-metadata) error: " + err.message);
+    //     updateStep(0, "failed", err.message);
+    //     setFatalError(err.message);
+    //     await updateJobToFailed(err.message);
+    //     return;
+    //   }
+
+    //   // ── Step 1b – Reuse detection ──
+    //   if (datasourceName && workspaceId) {
+    //     updateStep(0, "running", "Checking for a reusable semantic model…");
+    //     try {
+    //       const jobsRes = await fetch(`${DB_BASE_URL}/jobs/user/${encodeURIComponent(currentUserEmail)}`);
+    //       if (jobsRes.ok) {
+    //         const jobs: MigrationJob[] = await jobsRes.json();
+    //         const matches = jobs.filter(
+    //           (j) =>
+    //             j.WorkspaceId === workspaceId &&
+    //             j.DatasourceName === datasourceName &&
+    //             j.MigrationStatus === "Completed" &&
+    //             j.DatasetId,
+    //         );
+    //         if (matches.length > 0) {
+    //           // Most recent by CompletedAt (fallback StartedAt)
+    //           matches.sort((a, b) => {
+    //             const aTime = new Date(a.CompletedAt || a.StartedAt || 0).getTime();
+    //             const bTime = new Date(b.CompletedAt || b.StartedAt || 0).getTime();
+    //             return bTime - aTime;
+    //           });
+    //           const best = matches[0];
+    //           updateStep(0, "running", "Found an existing semantic model for this datasource…");
+    //           const wantsReuse = await promptForReuse(best);
+    //           if (wantsReuse) {
+    //             reuseMode = true;
+    //             reuseDatasetId = best.DatasetId || null;
+    //             sessionStorage.setItem("current_dataset_id", reuseDatasetId || "");
+    //             log(`Reusing DatasetId ${reuseDatasetId} from job ${best.Id}`);
+    //           }
+    //         }
+    //       } else {
+    //         log(`Job lookup failed (${jobsRes.status}) — proceeding without reuse check`);
+    //       }
+    //     } catch (err: any) {
+    //       // Reuse detection failing should never block a normal migration.
+    //       log("Reuse detection error (non-fatal): " + err.message);
+    //     }
+    //   }
+
+    //   // ── Step 1c – Parse (skipped entirely on reuse) ──
+    //   if (!reuseMode) {
+    //     updateStep(0, "running", "Parsing workbook…");
+    //     try {
+    //       const filename = reportName.replace(/\.twbx$/i, "");
+    //       const parseRes = await fetch(
+    //         `https://tomgenratorupdatedapp-akh9c9a4cxg3czgv.eastus-01.azurewebsites.net/parse/${encodeURIComponent(filename)}`,
+    //         { method: "POST", headers: { accept: "application/json" } },
+    //       );
+    //       if (!parseRes.ok) throw new Error(`Parse failed (${parseRes.status})`);
+    //       const parseData = await parseRes.json();
+    //       console.log("Parse response:", parseData);
+    //       sessionStorage.setItem("parsed_workbook_data", JSON.stringify(parseData));
+    //     } catch (err: any) {
+    //       log("Step 1 (parse) error: " + err.message);
+    //       updateStep(0, "failed", err.message);
+    //       setFatalError(err.message);
+    //       await updateJobToFailed(err.message);
+    //       return;
+    //     }
+    //   } else {
+    //     log("Reuse mode — skipping parse step");
+    //   }
+
+    //   // ── Step 1d – Upload report (new dataset, or bound to reused DatasetId) ──
+    //   updateStep(0, "running", reuseMode ? "Binding report to existing dataset…" : "Uploading report…");
+    //   try {
+    //     const uploadPayload: Record<string, string> = { workspace_id: workspaceId, report_name: reportName };
+    //     if (reuseMode && reuseDatasetId) {
+    //       // NOTE: report-uploader backend doesn't accept dataset_id yet —
+    //       // this is the wiring we're prepping for the upload-report backend change next.
+    //       uploadPayload.dataset_id = reuseDatasetId;
+    //     }
+
+    //     const uploadRes = await fetch(
+    //       "https://report-uploader-awa8avchh6gqa3ad.eastus-01.azurewebsites.net/upload-report",
+    //       {
+    //         method: "POST",
+    //         headers: { "Content-Type": "application/json", accept: "application/json" },
+    //         body: JSON.stringify(uploadPayload),
+    //       },
+    //     );
+    //     if (!uploadRes.ok) throw new Error(`Upload report failed (${uploadRes.status})`);
+    //     const uploadResult = await uploadRes.json();
+    //     console.log("Upload report response:", uploadResult);
+
+    //     sessionStorage.setItem("upload_response", JSON.stringify(uploadResult));
+    //     sessionStorage.setItem("upload_message", uploadResult.message || "");
+    //     sessionStorage.setItem("upload_workspace_id", uploadResult.workspace_id || workspaceId);
+    //     sessionStorage.setItem("upload_report_name", uploadResult.report_name || reportName);
+    //     sessionStorage.setItem("upload_report_id", uploadResult.report_id || "");
+    //     sessionStorage.setItem("upload_dataset_id", uploadResult.dataset_id || reuseDatasetId || "");
+    //     // Legacy keys
+    //     sessionStorage.setItem("report_name", uploadResult.report_name || reportName);
+    //     sessionStorage.setItem("report_id", uploadResult.report_id || "");
+    //     sessionStorage.setItem("workspace_id", uploadResult.workspace_id || workspaceId);
+    //     sessionStorage.setItem("workspace_name", workspaceName);
+
+    //     if (!reuseMode) {
+    //       // Only overwrite with a freshly-created dataset id; reuse already set this above.
+    //       sessionStorage.setItem("current_dataset_id", uploadResult.dataset_id || "");
+    //     }
+
+    //     updateStep(0, "completed", "Metadata Extraction completed");
+    //   } catch (err: any) {
+    //     log("Step 1 (upload-report) error: " + err.message);
+    //     updateStep(0, "failed", err.message);
+    //     setFatalError(err.message);
+    //     await updateJobToFailed(err.message);
+    //     return;
+    //   }
+
+    //   // ── Step 2 – Artifact Generation (auto-complete) ──
+    //   updateStep(1, "running", "Processing…");
+    //   await delay(1200);
+    //   updateStep(1, "completed", "Artifact Generation completed");
+
+    //   // ── Step 3 – Dataset & Report Creation ──
+    //   if (reuseMode) {
+    //     // Skip Lakehouse migrate + Deploy entirely — the existing semantic model is reused as-is.
+    //     updateStep(2, "running", "Reusing existing semantic model…");
+    //     await delay(600);
+    //     updateStep(2, "completed", "Reused existing semantic model — skipped dataset creation");
+    //   } else {
+    //     updateStep(2, "running", "Migrating to Lakehouse…");
+    //     try {
+    //       const fileName = `${reportName}.twbx`;
+    //       const lakehouseBody: Record<string, string> = { file_name: fileName, workspace_id: workspaceId };
+
+    //       const postLakehouse = async (payload: Record<string, string>) => {
+    //         const res = await fetch(LAKEHOUSE_URL, {
+    //           method: "POST",
+    //           headers: { "Content-Type": "application/json", accept: "application/json" },
+    //           body: JSON.stringify(payload),
+    //         });
+
+    //         let data: any = {};
+    //         try {
+    //           data = await res.json();
+    //         } catch {
+    //           data = {};
+    //         }
+
+    //         return { res, data };
+    //       };
+
+    //       const getLakehouseError = (data: any, status: number) =>
+    //         data?.detail || data?.message || `Lakehouse migration failed (${status})`;
+
+    //       let lakehouseRes: Response | null = null;
+    //       let lakehouseData: any = {};
+    //       let isLakehouseSuccess = false;
+
+    //       for (let attempt = 1; attempt <= 2; attempt += 1) {
+    //         updateStep(2, "running", `Migrating to Lakehouse… (attempt ${attempt}/2)`);
+    //         const { res, data } = await postLakehouse(lakehouseBody);
+    //         lakehouseRes = res;
+    //         lakehouseData = data;
+
+    //         if (res.ok && data?.status === "success") {
+    //           isLakehouseSuccess = true;
+    //           break;
+    //         }
+
+    //         log(`Lakehouse attempt ${attempt} failed: ${getLakehouseError(data, res.status)}`);
+    //       }
+
+    //       if (!isLakehouseSuccess) {
+    //         log("Lakehouse failed twice, prompting for password…");
+    //         updateStep(2, "running", "Password required – waiting for input…");
+
+    //         const password = await promptForPassword();
+    //         if (!password) {
+    //           throw new Error("Password entry cancelled by user");
+    //         }
+
+    //         updateStep(2, "running", "Retrying Lakehouse migration with password…");
+    //         const { res, data } = await postLakehouse({ ...lakehouseBody, password });
+    //         lakehouseRes = res;
+    //         lakehouseData = data;
+    //         isLakehouseSuccess = res.ok && data?.status === "success";
+    //       }
+
+    //       if (!isLakehouseSuccess || !lakehouseRes) {
+    //         throw new Error(getLakehouseError(lakehouseData, lakehouseRes?.status ?? 500));
+    //       }
+
+    //       console.log("Lakehouse migration successful:", lakehouseData);
+    //       sessionStorage.setItem("lakehouse_response", JSON.stringify(lakehouseData));
+
+    //       // 3b) Deploy semantic model
+    //       updateStep(2, "running", "Deploying semantic model…");
+    //       const parsedRaw = sessionStorage.getItem("parsed_workbook_data");
+    //       const modelSchema = parsedRaw ? JSON.parse(parsedRaw) : {};
+
+    //       const deployPayload = {
+    //         workspaceName,
+    //         lakehouseServer: lakehouseData.sql_endpoint_connection,
+    //         lakehouseDatabase: lakehouseData.lakehouse_name,
+    //         modelSchema,
+    //       };
+    //       console.log("Deploy payload:", deployPayload);
+
+    //       const deployRes = await fetch(DEPLOY_URL, {
+    //         method: "POST",
+    //         headers: { "Content-Type": "application/json", accept: "application/json" },
+    //         body: JSON.stringify(deployPayload),
+    //       });
+    //       const deployData = await deployRes.json();
+    //       console.log("Deploy response:", deployData);
+    //       sessionStorage.setItem("deploy_response", JSON.stringify(deployData));
+
+    //       if (!deployRes.ok) {
+    //         throw new Error(deployData.detail || deployData.message || "Semantic model deployment failed");
+    //       }
+
+    //       // Capture the newly-deployed DatasetId for Preview.tsx to write on completion.
+    //       const newDatasetId = deployData.datasetId || deployData.dataset_id || sessionStorage.getItem("current_dataset_id") || "";
+    //       if (newDatasetId) {
+    //         sessionStorage.setItem("current_dataset_id", newDatasetId);
+    //       }
+
+    //       updateStep(2, "completed", "Dataset & Report Creation completed");
+    //     } catch (err: any) {
+    //       log("Step 3 error: " + err.message);
+    //       updateStep(2, "failed", err.message);
+    //       setFatalError(err.message);
+    //       await updateJobToFailed(err.message);
+    //       return;
+    //     }
+    //   }
+
+    //   // ── Step 4 – Deployment (auto-complete) ──
+    //   updateStep(3, "running", "Processing…");
+    //   await delay(1200);
+    //   updateStep(3, "completed", "Deployment completed");
+
+    //   // ── Step 5 – Validation (auto-complete) ──
+    //   updateStep(4, "running", "Validating…");
+    //   await delay(1200);
+    //   updateStep(4, "completed", "Validation completed");
+
+    //   log("Migration flow completed");
+    //   setIsComplete(true);
+    // };
+
+        const run = async () => {
       let metaData: any = null;
       let datasourceName = "";
 
-      // ── Step 1a – Metadata Extraction (moved first: needed for reuse detection) ──
-      updateStep(0, "running", "Extracting metadata…");
+      // Load optional KPI suggestions (set by "Migrate With Suggestions")
+      const suggestionsRaw = sessionStorage.getItem("migration_suggestions");
+      let suggestionsBody: { remap: Record<string, string>; remove: string[] } | null = null;
+      try {
+        const parsed = suggestionsRaw ? JSON.parse(suggestionsRaw) : null;
+        if (parsed?.enabled && (parsed.remap || (parsed.remove && parsed.remove.length))) {
+          suggestionsBody = {
+            remap: parsed.remap ?? {},
+            remove: parsed.remove ?? [],
+          };
+          log(`Using KPI suggestions: remove=[${suggestionsBody.remove.join(", ")}]`);
+        }
+      } catch {
+        suggestionsBody = null;
+      }
+
+      // ── Step 1a – Metadata Extraction ──
+      updateStep(0, "running", suggestionsBody ? "Extracting metadata (with suggestions)…" : "Extracting metadata…");
       try {
         const metaRes = await fetch(
           `https://relationshipss-b3fbh7cehtfjghhr.eastus-01.azurewebsites.net/extract-metadata?folder_name=${encodeURIComponent(reportName)}`,
-          { method: "POST" },
+          {
+            method: "POST",
+            headers: suggestionsBody
+              ? { "Content-Type": "application/json", accept: "application/json" }
+              : { accept: "application/json" },
+            body: suggestionsBody ? JSON.stringify(suggestionsBody) : undefined,
+          },
         );
         if (!metaRes.ok) throw new Error(`Metadata extraction failed (${metaRes.status})`);
         metaData = await metaRes.json();
@@ -172,11 +472,10 @@ export default function Migration() {
           sessionStorage.setItem("metadataOutputBlobUrl", metaData.outputBlobUrl);
         }
 
-        // ASSUMPTION replaced with confirmed shape: datasourceName lives under metaData.metadata.datasourceName
-         datasourceName = metaData.metadata?.datasourceName || "";
-         if (datasourceName) {
-           sessionStorage.setItem("current_datasource_name", datasourceName);
-         }
+        datasourceName = metaData.metadata?.datasourceName || "";
+        if (datasourceName) {
+          sessionStorage.setItem("current_datasource_name", datasourceName);
+        }
       } catch (err: any) {
         log("Step 1 (extract-metadata) error: " + err.message);
         updateStep(0, "failed", err.message);
@@ -200,7 +499,6 @@ export default function Migration() {
                 j.DatasetId,
             );
             if (matches.length > 0) {
-              // Most recent by CompletedAt (fallback StartedAt)
               matches.sort((a, b) => {
                 const aTime = new Date(a.CompletedAt || a.StartedAt || 0).getTime();
                 const bTime = new Date(b.CompletedAt || b.StartedAt || 0).getTime();
@@ -220,19 +518,24 @@ export default function Migration() {
             log(`Job lookup failed (${jobsRes.status}) — proceeding without reuse check`);
           }
         } catch (err: any) {
-          // Reuse detection failing should never block a normal migration.
           log("Reuse detection error (non-fatal): " + err.message);
         }
       }
 
-      // ── Step 1c – Parse (skipped entirely on reuse) ──
+      // ── Step 1c – Parse (skipped on reuse) ──
       if (!reuseMode) {
-        updateStep(0, "running", "Parsing workbook…");
+        updateStep(0, "running", suggestionsBody ? "Parsing workbook (with suggestions)…" : "Parsing workbook…");
         try {
           const filename = reportName.replace(/\.twbx$/i, "");
           const parseRes = await fetch(
             `https://tomgenratorupdatedapp-akh9c9a4cxg3czgv.eastus-01.azurewebsites.net/parse/${encodeURIComponent(filename)}`,
-            { method: "POST", headers: { accept: "application/json" } },
+            {
+              method: "POST",
+              headers: suggestionsBody
+                ? { "Content-Type": "application/json", accept: "application/json" }
+                : { accept: "application/json" },
+              body: suggestionsBody ? JSON.stringify(suggestionsBody) : undefined,
+            },
           );
           if (!parseRes.ok) throw new Error(`Parse failed (${parseRes.status})`);
           const parseData = await parseRes.json();
@@ -249,13 +552,11 @@ export default function Migration() {
         log("Reuse mode — skipping parse step");
       }
 
-      // ── Step 1d – Upload report (new dataset, or bound to reused DatasetId) ──
+      // ── Step 1d – Upload report ──
       updateStep(0, "running", reuseMode ? "Binding report to existing dataset…" : "Uploading report…");
       try {
         const uploadPayload: Record<string, string> = { workspace_id: workspaceId, report_name: reportName };
         if (reuseMode && reuseDatasetId) {
-          // NOTE: report-uploader backend doesn't accept dataset_id yet —
-          // this is the wiring we're prepping for the upload-report backend change next.
           uploadPayload.dataset_id = reuseDatasetId;
         }
 
@@ -277,14 +578,12 @@ export default function Migration() {
         sessionStorage.setItem("upload_report_name", uploadResult.report_name || reportName);
         sessionStorage.setItem("upload_report_id", uploadResult.report_id || "");
         sessionStorage.setItem("upload_dataset_id", uploadResult.dataset_id || reuseDatasetId || "");
-        // Legacy keys
         sessionStorage.setItem("report_name", uploadResult.report_name || reportName);
         sessionStorage.setItem("report_id", uploadResult.report_id || "");
         sessionStorage.setItem("workspace_id", uploadResult.workspace_id || workspaceId);
         sessionStorage.setItem("workspace_name", workspaceName);
 
         if (!reuseMode) {
-          // Only overwrite with a freshly-created dataset id; reuse already set this above.
           sessionStorage.setItem("current_dataset_id", uploadResult.dataset_id || "");
         }
 
@@ -297,14 +596,13 @@ export default function Migration() {
         return;
       }
 
-      // ── Step 2 – Artifact Generation (auto-complete) ──
+      // ── Step 2 – Artifact Generation ──
       updateStep(1, "running", "Processing…");
       await delay(1200);
       updateStep(1, "completed", "Artifact Generation completed");
 
       // ── Step 3 – Dataset & Report Creation ──
       if (reuseMode) {
-        // Skip Lakehouse migrate + Deploy entirely — the existing semantic model is reused as-is.
         updateStep(2, "running", "Reusing existing semantic model…");
         await delay(600);
         updateStep(2, "completed", "Reused existing semantic model — skipped dataset creation");
@@ -375,7 +673,7 @@ export default function Migration() {
           console.log("Lakehouse migration successful:", lakehouseData);
           sessionStorage.setItem("lakehouse_response", JSON.stringify(lakehouseData));
 
-          // 3b) Deploy semantic model
+          // 3b) Deploy semantic model (modelSchema already filtered if suggestions were applied at parse)
           updateStep(2, "running", "Deploying semantic model…");
           const parsedRaw = sessionStorage.getItem("parsed_workbook_data");
           const modelSchema = parsedRaw ? JSON.parse(parsedRaw) : {};
@@ -401,8 +699,8 @@ export default function Migration() {
             throw new Error(deployData.detail || deployData.message || "Semantic model deployment failed");
           }
 
-          // Capture the newly-deployed DatasetId for Preview.tsx to write on completion.
-          const newDatasetId = deployData.datasetId || deployData.dataset_id || sessionStorage.getItem("current_dataset_id") || "";
+          const newDatasetId =
+            deployData.datasetId || deployData.dataset_id || sessionStorage.getItem("current_dataset_id") || "";
           if (newDatasetId) {
             sessionStorage.setItem("current_dataset_id", newDatasetId);
           }
@@ -417,16 +715,17 @@ export default function Migration() {
         }
       }
 
-      // ── Step 4 – Deployment (auto-complete) ──
+      // ── Step 4 – Deployment ──
       updateStep(3, "running", "Processing…");
       await delay(1200);
       updateStep(3, "completed", "Deployment completed");
 
-      // ── Step 5 – Validation (auto-complete) ──
+      // ── Step 5 – Validation ──
       updateStep(4, "running", "Validating…");
       await delay(1200);
       updateStep(4, "completed", "Validation completed");
 
+      sessionStorage.removeItem("migration_suggestions");
       log("Migration flow completed");
       setIsComplete(true);
     };
