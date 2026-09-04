@@ -726,6 +726,7 @@ const PreMigrationAnalysis = () => {
   const [result, setResult] = useState<FullAnalysisResponse | null>(null);
   const [activeWorkbookId, setActiveWorkbookId] = useState<string | null>(null);
   const [isPreparingMigration, setIsPreparingMigration] = useState(false);
+  const [migrationMode, setMigrationMode] = useState<"withSuggestions" | "withoutSuggestions" | null>(null);
   const workbookDetailRef = useRef<HTMLDivElement>(null);
 
   const runAnalysis = async () => {
@@ -927,10 +928,12 @@ const PreMigrationAnalysis = () => {
       toast({ title: "Migration failed", description: message, variant: "destructive" });
     } finally {
       setIsPreparingMigration(false);
+      setMigrationMode(null)
     }
   };
 
   const handleMigrateWithSuggestions = async () => {
+      setMigrationMode("withSuggestions");
     const payload = buildSuggestionsPayload();
     sessionStorage.setItem("migration_suggestions", JSON.stringify(payload));
     if (!payload.enabled) {
@@ -943,6 +946,7 @@ const PreMigrationAnalysis = () => {
   };
 
   const handleMigrateWithoutSuggestions = async () => {
+    setMigrationMode("withoutSuggestions");
     sessionStorage.removeItem("migration_suggestions");
     await handleMigrateToPowerBI();
   };
@@ -1200,30 +1204,30 @@ const PreMigrationAnalysis = () => {
                     Migrate Without Suggestions
                   </Button>
                 </div> */}
-                              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  onClick={handleMigrateWithSuggestions}
-                  disabled={isPreparingMigration}
-                >
-                  {isPreparingMigration ? (
-                    <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
-                  ) : null}
-                  Migrate With Suggestions
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    onClick={handleMigrateWithSuggestions}
+                    disabled={isPreparingMigration}
+                  >
+                    {migrationMode === "withSuggestions" ? (
+                      <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
+                    ) : null}
+                    Migrate With Suggestions
+                  </Button>
 
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleMigrateWithoutSuggestions}
-                  disabled={isPreparingMigration}
-                >
-                  {isPreparingMigration ? (
-                    <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
-                  ) : null}
-                  Migrate Without Suggestions
-                </Button>
-              </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleMigrateWithoutSuggestions}
+                    disabled={isPreparingMigration}
+                  >
+                    {migrationMode === "withoutSuggestions" ? (
+                      <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
+                    ) : null}
+                    Migrate Without Suggestions
+                  </Button>
+                </div>
             </div>
             <WorkbookAnalysisPanel
               bundle={activeWorkbook}
