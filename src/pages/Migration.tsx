@@ -847,8 +847,6 @@
 //   );
 // }
 
-
-
 import { useState, useEffect, Fragment } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { CheckCircle2, Circle, Loader2, XCircle, ArrowLeft, ExternalLink, RefreshCw, ClipboardList } from "lucide-react";
@@ -1554,8 +1552,6 @@ export default function Migration() {
                   <thead className="bg-gray-50">
                     <tr className="text-left">
                       <th className="p-2 font-medium">KPI</th>
-                      <th className="p-2 font-medium">Tableau</th>
-                      <th className="p-2 font-medium">Power BI</th>
                       <th className="p-2 font-medium">Status</th>
                     </tr>
                   </thead>
@@ -1564,8 +1560,6 @@ export default function Migration() {
                       <Fragment key={r.name}>
                         <tr className={cn("border-t", !r.match && "bg-red-50")}>
                           <td className="p-2 font-medium">{r.name}</td>
-                          <td className="p-2">{r.tableau_result}</td>
-                          <td className="p-2">{r.powerbi_result}</td>
                           <td className="p-2">
                             {r.match ? (
                               <span className="inline-flex items-center gap-1 text-green-700">
@@ -1580,7 +1574,7 @@ export default function Migration() {
                         </tr>
                         {!r.match && (
                           <tr className="bg-red-50/60 border-t border-red-100">
-                            <td colSpan={4} className="p-2 pl-4 text-xs text-red-700">
+                            <td colSpan={2} className="p-2 pl-4 text-xs text-red-700">
                               {r.explanation}
                             </td>
                           </tr>
