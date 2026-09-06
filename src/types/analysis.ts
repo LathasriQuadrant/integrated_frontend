@@ -87,6 +87,7 @@ export interface KpiMetadata {
   formula: string;
   aggregation: string;
   dependencies: string[];
+  source: string;
 }
 
 export interface DependencyMetadata {
