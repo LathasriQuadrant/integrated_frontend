@@ -46,6 +46,54 @@ const NA = () => <span className="text-muted-foreground italic">Not available</s
 const displayName = (entity: { caption?: string; name?: string } | undefined | null, fallback = "Unnamed"): string =>
   entity?.caption?.trim() || entity?.name?.trim() || fallback;
 
+/** Map physical column / measure names → table name from data_model.tables */
+function buildFieldToTableMap(
+  tables: Array<{ name?: string; table?: string; columns?: string[] }>,
+): Map<string, string> {
+  const map = new Map<string, string>();
+
+  const add = (key: string | undefined, tableName: string) => {
+    if (!key?.trim() || !tableName) return;
+    const k = key.trim().toLowerCase();
+    if (!map.has(k)) map.set(k, tableName);
+    const spaced = k.replace(/_/g, " ");
+    if (!map.has(spaced)) map.set(spaced, tableName);
+    const underscored = k.replace(/\s+/g, "_");
+    if (!map.has(underscored)) map.set(underscored, tableName);
+  };
+
+  for (const t of tables) {
+    const tableName = (t.name || t.table || "").trim();
+    if (!tableName) continue;
+    for (const col of t.columns ?? []) {
+      add(col, tableName);
+    }
+  }
+  return map;
+}
+
+function resolveTableForKpi(
+  kpi: { name?: string; source?: string; formula?: string },
+  fieldToTable: Map<string, string>,
+): string | null {
+  const hasFormula = Boolean((kpi.formula || "").trim());
+  const isCalculated =
+    (kpi.source || "").toLowerCase() === "calculated_field" || hasFormula;
+
+  // Calculated KPIs are not physical columns
+  if (isCalculated) return null;
+
+  const name = (kpi.name || "").trim();
+  if (!name) return null;
+
+  return (
+    fieldToTable.get(name.toLowerCase()) ||
+    fieldToTable.get(name.toLowerCase().replace(/\s+/g, "_")) ||
+    fieldToTable.get(name.toLowerCase().replace(/_/g, " ")) ||
+    null
+  );
+}
+
 interface WorkbookAnalysisPanelProps {
   bundle: WorkbookBundle;
   usage?: UsageAnalysisResult;
@@ -98,6 +146,11 @@ const WorkbookAnalysisPanel = ({ bundle, usage, complexity, sharedTableNames }: 
     });
     return Array.from(map.values());
   }, [bundle.data_model?.tables]);
+
+  const fieldToTable = useMemo(
+    () => buildFieldToTableMap(mergedTables),
+    [mergedTables],
+  );
 
   const structure = {
     dashboards: bundle.components?.dashboards?.length ?? bundle.reports?.dashboards?.length ?? 0,
@@ -356,7 +409,7 @@ const WorkbookAnalysisPanel = ({ bundle, usage, complexity, sharedTableNames }: 
               <span className="text-xs font-normal text-muted-foreground">({bundle.kpis?.length ?? 0})</span>
             </span>
           </AccordionTrigger>
-          <AccordionContent className="px-4 pb-4">
+          {/* <AccordionContent className="px-4 pb-4">
             {bundle.kpis?.length ? (
               <div className="space-y-2">
                 {bundle.kpis.map((kpi, i) => (
@@ -382,6 +435,56 @@ const WorkbookAnalysisPanel = ({ bundle, usage, complexity, sharedTableNames }: 
                     )}
                   </div>
                 ))}
+              </div>
+            ) : (
+              <NA />
+            )}
+          </AccordionContent> */}
+                    <AccordionContent className="px-4 pb-4">
+            {bundle.kpis?.length ? (
+              <div className="space-y-2">
+                {bundle.kpis.map((kpi, i) => {
+                  const tableName = resolveTableForKpi(kpi, fieldToTable);
+                  const hasFormula = Boolean((kpi.formula || "").trim());
+                  const isCalculated =
+                    (kpi.source || "").toLowerCase() === "calculated_field" || hasFormula;
+
+                  return (
+                    <div key={i} className="p-3 rounded-md border border-border">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-medium">{kpi.name || `KPI ${i + 1}`}</p>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {tableName && (
+                            <span className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                              Table: {tableName}
+                            </span>
+                          )}
+                          {isCalculated && !tableName && (
+                            <span className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                              Calculated
+                            </span>
+                          )}
+                          {kpi.aggregation && (
+                            <span className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                              {kpi.aggregation}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {kpi.formula && (
+                        <details className="mt-1.5 group">
+                          <summary className="text-xs text-primary cursor-pointer select-none list-none inline-flex items-center gap-1 hover:underline">
+                            <span className="group-open:hidden">View formula</span>
+                            <span className="hidden group-open:inline">Hide formula</span>
+                          </summary>
+                          <pre className="text-xs bg-muted/50 rounded p-2 mt-2 overflow-x-auto font-mono">
+                            <code>{kpi.formula}</code>
+                          </pre>
+                        </details>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <NA />
