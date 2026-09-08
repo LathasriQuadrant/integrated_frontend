@@ -108,7 +108,7 @@
 //   return context;
 // }
 
-import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from "react";
 import { User } from "@/types/migration";
 
 interface AuthContextType {
@@ -146,7 +146,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user, isLoading]);
 
   // Check Azure AD authentication status by calling the backend
-  const checkAuth = async (): Promise<boolean> => {
+  // 🔧 FIX: wrapped in useCallback with [] deps so this function keeps the
+  // SAME reference across renders. Previously it was a plain function
+  // recreated on every render, which meant Login.tsx's polling useEffect
+  // (which depends on this via checkAuthCompletion) tore down and rebuilt
+  // its setInterval on nearly every auth-state change instead of owning
+  // one stable interval for the lifetime of the poll.
+  const checkAuth = useCallback(async (): Promise<boolean> => {
     // ✅ ADDED LOGGING
     console.log("🔍 checkAuth() called");
     console.trace("🔍 checkAuth call stack");
@@ -186,9 +192,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     return false;
-  };
-
-  // Check for local/session-based authentication
+  }, []);
   const checkLocalAuth = (): boolean => {
     const isLocalAuth = sessionStorage.getItem("local_authenticated") === "true";
     const isPowerBIAuth = sessionStorage.getItem("powerbi_authenticated") === "true";
