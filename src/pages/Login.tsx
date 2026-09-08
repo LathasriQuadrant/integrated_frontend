@@ -234,7 +234,7 @@
 
 // export default Login;
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Shield, Zap, Clock, ArrowLeft, ExternalLink, Loader2 } from "lucide-react";
@@ -248,6 +248,23 @@ const Login = () => {
   const { isAuthenticated, checkAuth } = useAuth();
   const [isWaiting, setIsWaiting] = useState(false);
   const [loginWindow, setLoginWindow] = useState<Window | null>(null);
+
+  // 🔧 FIX: once we've successfully completed auth once and navigated away,
+  // this flag makes checkAuthCompletion a permanent no-op. Without it, a
+  // storage-event trigger and a poll-interval tick that both fire around
+  // the same time (or a stray interval left over from a churned effect)
+  // could each independently call navigate('/dashboard') again later,
+  // including from a tab/instance the user thinks they've left behind.
+  const hasCompletedRef = useRef(false);
+
+  // ✅ ADDED LOGGING - confirms whether Login is actually mounted/unmounted
+  // when you expect it to be, and whether any interval outlives it.
+  useEffect(() => {
+    console.log("🟠 Login.tsx MOUNTED", { timestamp: new Date().toISOString() });
+    return () => {
+      console.warn("🟠 Login.tsx UNMOUNTING", { timestamp: new Date().toISOString() });
+    };
+  }, []);
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -267,6 +284,21 @@ const Login = () => {
 
   // Check if auth completed via backend or localStorage (cross-tab)
   const checkAuthCompletion = useCallback(async () => {
+    // 🔧 FIX: if we've already completed and navigated once, do nothing.
+    if (hasCompletedRef.current) {
+      // ✅ ADDED LOGGING
+      console.log("🟠 checkAuthCompletion(): already completed, skipping (no-op)", {
+        timestamp: new Date().toISOString(),
+      });
+      return true;
+    }
+
+    // ✅ ADDED LOGGING
+    console.log("🟠 checkAuthCompletion() called", {
+      timestamp: new Date().toISOString(),
+      localStorage_powerbi_authenticated: localStorage.getItem("powerbi_authenticated"),
+    });
+
     // First check localStorage (set by PowerBIAuthSuccess in the popup)
     const localAuth = localStorage.getItem("powerbi_authenticated");
     if (localAuth === "true") {
@@ -284,6 +316,17 @@ const Login = () => {
       localStorage.removeItem("powerbi_authenticated");
       localStorage.removeItem("user_details");
       await checkAuth();
+
+      // 🔧 FIX: mark completed and stop the waiting state BEFORE navigating,
+      // so the polling effect's cleanup runs and no new interval can spawn.
+      hasCompletedRef.current = true;
+      setIsWaiting(false);
+
+      // ✅ ADDED LOGGING
+      console.warn("🟠 checkAuthCompletion(): localStorage branch - navigating to /dashboard", {
+        timestamp: new Date().toISOString(),
+      });
+      console.trace("🟠 checkAuthCompletion localStorage-branch navigate stack");
       navigate("/dashboard", { replace: true });
       return true;
     }
@@ -291,6 +334,15 @@ const Login = () => {
     // Fallback: try backend session check
     const isAuthed = await checkAuth();
     if (isAuthed) {
+      // 🔧 FIX: same guard as above for the fallback branch.
+      hasCompletedRef.current = true;
+      setIsWaiting(false);
+
+      // ✅ ADDED LOGGING
+      console.warn("🟠 checkAuthCompletion(): backend session branch - navigating to /dashboard", {
+        timestamp: new Date().toISOString(),
+      });
+      console.trace("🟠 checkAuthCompletion backend-branch navigate stack");
       navigate("/dashboard", { replace: true });
       return true;
     }
@@ -310,15 +362,35 @@ const Login = () => {
 
   // Poll for authentication completion when waiting
   useEffect(() => {
-    if (!isWaiting) return;
+    if (!isWaiting) {
+      // ✅ ADDED LOGGING
+      console.log("🟠 poll effect: isWaiting=false, no interval created");
+      return;
+    }
+
+    // ✅ ADDED LOGGING - a unique id per interval instance so we can tell
+    // multiple overlapping intervals apart in the console.
+    const intervalTag = Math.random().toString(36).slice(2, 8);
+    console.warn(`🟠 poll effect: CREATING interval [${intervalTag}]`, {
+      timestamp: new Date().toISOString(),
+      hasLoginWindow: !!loginWindow,
+    });
+    console.trace(`🟠 interval [${intervalTag}] creation stack`);
 
     const interval = setInterval(async () => {
+      // ✅ ADDED LOGGING
+      console.log(`🟠 interval [${intervalTag}] TICK`, {
+        timestamp: new Date().toISOString(),
+        loginWindowClosed: loginWindow?.closed,
+      });
+
       if (loginWindow && loginWindow.closed) {
         const isAuthed = await checkAuthCompletion();
         if (!isAuthed) {
           setIsWaiting(false);
           setLoginWindow(null);
         }
+        console.warn(`🟠 interval [${intervalTag}] clearing (loginWindow closed branch)`);
         clearInterval(interval);
         return;
       }
@@ -326,16 +398,29 @@ const Login = () => {
       const isAuthed = await checkAuthCompletion();
       if (isAuthed) {
         loginWindow?.close();
+        console.warn(`🟠 interval [${intervalTag}] clearing (auth succeeded)`);
         clearInterval(interval);
       }
     }, 2000);
 
-    return () => clearInterval(interval);
+    return () => {
+      // ✅ ADDED LOGGING
+      console.warn(`🟠 poll effect CLEANUP: clearing interval [${intervalTag}]`, {
+        timestamp: new Date().toISOString(),
+      });
+      clearInterval(interval);
+    };
   }, [isWaiting, loginWindow, checkAuthCompletion]);
 
   const handleAzureSignIn = () => {
+    // ✅ ADDED LOGGING
+    console.warn("🟠 handleAzureSignIn() CLICKED", { timestamp: new Date().toISOString() });
     setIsWaiting(true);
     const newWindow = window.open(LOGIN_URL, "_blank", "noopener");
+    // ✅ ADDED LOGGING - with `noopener`, most browsers return null here,
+    // which means the interval's "loginWindow.closed" branch can never
+    // fire and the poll can only ever stop via a successful auth check.
+    console.log("🟠 window.open() returned:", { isNull: newWindow === null, newWindow });
     setLoginWindow(newWindow);
   };
 
