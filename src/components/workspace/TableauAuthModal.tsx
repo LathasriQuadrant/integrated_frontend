@@ -185,3 +185,4 @@ const TableauAuthModal = ({ isOpen, onSuccess, onCancel }: TableauAuthModalProps
 };
 
 export default TableauAuthModal;
+ 
