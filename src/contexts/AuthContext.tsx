@@ -93,6 +93,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Optionally call backend logout endpoint
   };
 
+  const logout = () => {
+    setUser(null);
+    // Clear Power BI authentication
+    sessionStorage.removeItem("powerbi_authenticated");
+    sessionStorage.removeItem("local_authenticated");
+    sessionStorage.removeItem("azure_user_name");
+    sessionStorage.removeItem("azure_user_email");
+    sessionStorage.removeItem("azure_user_oid");
+    sessionStorage.removeItem("azure_user_tenant");
+    
+    // Clear Tableau session data
+    sessionStorage.removeItem("tableau_api_token");
+    sessionStorage.removeItem("tableau_user_id");
+    sessionStorage.removeItem("tableau_site_content_url");
+    sessionStorage.removeItem("tableau_server_url");
+    sessionStorage.removeItem("tableau_session_id");
+    
+    // Optionally call backend logout endpoint
+  };
+
   return (
     <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, checkAuth, logout }}>
       {children}
