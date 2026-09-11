@@ -82,16 +82,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initAuth();
   }, []);
 
-  const logout = () => {
-    setUser(null);
-    sessionStorage.removeItem("powerbi_authenticated");
-    sessionStorage.removeItem("local_authenticated");
-    sessionStorage.removeItem("azure_user_name");
-    sessionStorage.removeItem("azure_user_email");
-    sessionStorage.removeItem("azure_user_oid");
-    sessionStorage.removeItem("azure_user_tenant");
-    // Optionally call backend logout endpoint
-  };
+  // const logout = () => {
+  //   setUser(null);
+  //   sessionStorage.removeItem("powerbi_authenticated");
+  //   sessionStorage.removeItem("local_authenticated");
+  //   sessionStorage.removeItem("azure_user_name");
+  //   sessionStorage.removeItem("azure_user_email");
+  //   sessionStorage.removeItem("azure_user_oid");
+  //   sessionStorage.removeItem("azure_user_tenant");
+  //   // Optionally call backend logout endpoint
+  // };
 
   const logout = () => {
     setUser(null);
