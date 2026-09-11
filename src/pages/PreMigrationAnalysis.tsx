@@ -696,6 +696,15 @@ import {
   SlidersHorizontal as SlidersHorizontalIcon,
   ListFilter as ListFilterIcon,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { discoveryApi, DiscoveryResponse } from "@/api/discoveryApi";
 
 // const TABLEAU_BACKEND_URL = import.meta.env.VITE_TABLEAU_BACKEND_URL || "http://localhost:8000";
 const TABLEAU_BACKEND_URL = "https://frame-premigration-test-cabfgrazgacqgzf9.eastus-01.azurewebsites.net";
@@ -729,6 +738,45 @@ const PreMigrationAnalysis = () => {
   const [migrationMode, setMigrationMode] = useState<"withSuggestions" | "withoutSuggestions" | null>(null);
   const workbookDetailRef = useRef<HTMLDivElement>(null);
 
+  // ---------------- Discovery (runs before analysis) ----------------
+  const [discoveries, setDiscoveries] = useState<DiscoveryResponse[]>([]);
+  const [discoveryLoading, setDiscoveryLoading] = useState(true);
+  const [discoveryDone, setDiscoveryDone] = useState(false);
+  const [showDiscoveryPopup, setShowDiscoveryPopup] = useState(false);
+
+  const fetchDiscovery = async () => {
+    const token = sessionStorage.getItem("tableau_api_token");
+    if (!token) {
+      toast({ title: "Session expired", description: "Please sign in again", variant: "destructive" });
+      navigate("/");
+      return;
+    }
+
+    setDiscoveryLoading(true);
+    try {
+      const discoveryPromises =
+        navState?.workbookIds?.map((workbookId) =>
+          discoveryApi.getWorkbookDiscovery({
+            apiToken: token,
+            workbookIds: [workbookId],
+            siteContentUrl: "default",
+          })
+        ) || [];
+
+      const results = await Promise.all(discoveryPromises);
+      setDiscoveries(results);
+      setShowDiscoveryPopup(true);
+    } catch (err) {
+      console.error("Discovery failed:", err);
+      // Don't block the user if discovery fails — fall through to analysis
+      setDiscoveryDone(true);
+      runAnalysis();
+      return;
+    } finally {
+      setDiscoveryLoading(false);
+    }
+  };
+
   const runAnalysis = async () => {
     const token = sessionStorage.getItem("tableau_api_token");
     if (!token) {
@@ -758,7 +806,8 @@ const PreMigrationAnalysis = () => {
   };
 
   useEffect(() => {
-    runAnalysis();
+    // Fetch discovery FIRST — show the artifacts popup before running analysis
+    fetchDiscovery();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -952,6 +1001,80 @@ const PreMigrationAnalysis = () => {
   };
 
 
+
+  // ---------------- Discovery (shown before analysis) ----------------
+  if (!discoveryDone) {
+    return (
+      <AppLayout>
+        <div className="max-w-3xl mx-auto h-full flex flex-col items-center justify-center text-center gap-3">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <h2 className="text-base font-semibold">Discovering workbook artifacts…</h2>
+        </div>
+
+        <Dialog open={showDiscoveryPopup} onOpenChange={setShowDiscoveryPopup}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Workbook Artifacts</DialogTitle>
+              <DialogDescription>Quick overview of what we found</DialogDescription>
+            </DialogHeader>
+
+            {discoveryLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              </div>
+            ) : discoveries.length > 0 ? (
+              <div className="space-y-4">
+                {discoveries.map((discovery, idx) => {
+                  const wb = discovery.workbooks[0];
+                  if (!wb) return null;
+                  return (
+                    <div key={idx} className="p-4 bg-muted rounded-lg space-y-2">
+                      <h3 className="font-semibold">{wb.workbook_metadata.name}</h3>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div>
+                          <p className="text-muted-foreground">Dashboards</p>
+                          <p className="font-bold">{wb.reports.dashboards?.length || 0}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Worksheets</p>
+                          <p className="font-bold">{wb.reports.worksheets?.length || 0}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Datasources</p>
+                          <p className="font-bold">{wb.data_model.datasources?.length || 0}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Fields</p>
+                          <p className="font-bold">
+                            {(wb.fields.dimensions?.length || 0) + (wb.fields.measures?.length || 0)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => navigate(-1)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowDiscoveryPopup(false);
+                  setDiscoveryDone(true);
+                  runAnalysis();
+                }}
+              >
+                Proceed to Analysis
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </AppLayout>
+    );
+  }
 
   // ---------------- Loading ----------------
   if (isLoading) {
