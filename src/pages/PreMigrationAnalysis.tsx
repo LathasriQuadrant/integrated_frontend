@@ -705,6 +705,19 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { discoveryApi, DiscoveryResponse } from "@/api/discoveryApi";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import {
+  Table2,
+  Link2,
+  Calculator,
+  ListFilter,
+  BarChart3,
+} from "lucide-react";
 
 // const TABLEAU_BACKEND_URL = import.meta.env.VITE_TABLEAU_BACKEND_URL || "http://localhost:8000";
 const TABLEAU_BACKEND_URL = "https://frame-premigration-test-cabfgrazgacqgzf9.eastus-01.azurewebsites.net";
@@ -722,6 +735,29 @@ function average(nums: number[]): number {
 const underlineTabsList = "h-auto bg-transparent p-0 border-b border-border rounded-none justify-start gap-6";
 const underlineTabsTrigger =
   "px-0 py-2.5 rounded-none bg-transparent shadow-none data-[state=active]:bg-transparent data-[state=active]:shadow-none border-b-2 border-transparent data-[state=active]:border-primary text-muted-foreground data-[state=active]:text-foreground font-medium";
+
+/** A single labeled stat row used inside the discovery popup's accordion
+ * sections — icon, label, value, mirroring the pattern used elsewhere for
+ * artifact counts. */
+const DiscoveryMetricRow = ({
+  label,
+  value,
+  icon: Icon,
+}: {
+  label: string;
+  value: React.ReactNode;
+  icon: React.ComponentType<{ className?: string }>;
+}) => (
+  <div className="flex items-center justify-between py-1.5">
+    <div className="flex items-center gap-2 min-w-0">
+      <div className="w-6 h-6 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
+        <Icon className="w-3.5 h-3.5 text-primary" />
+      </div>
+      <span className="text-sm text-muted-foreground truncate">{label}</span>
+    </div>
+    <span className="text-sm font-semibold text-foreground tabular-nums flex-shrink-0 ml-2">{value}</span>
+  </div>
+);
 
 const PreMigrationAnalysis = () => {
   const location = useLocation();
@@ -1096,46 +1132,52 @@ const PreMigrationAnalysis = () => {
             ) : discoveries.length > 0 ? (
               <div className="space-y-6">
                 {/* Overview across all selected workbooks */}
-                <div>
-                  <h3 className="text-sm font-semibold mb-2">Overview</h3>
-                  <div className="grid grid-cols-2 gap-2 text-sm pl-2">
-                    <div>
-                      <p className="text-muted-foreground">Total Workbooks</p>
-                      <p className="font-bold">{discoveries.length}</p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    {
+                      label: "Workbooks",
+                      icon: Boxes,
+                      value: discoveries.length,
+                    },
+                    {
+                      label: "Dashboards",
+                      icon: LayoutGridIcon,
+                      value: discoveries.reduce((sum, d) => {
+                        const wb = d.workbooks[0];
+                        return sum + (wb ? getWorkbookStats(wb).dashboardCount : 0);
+                      }, 0),
+                    },
+                    {
+                      label: "Worksheets",
+                      icon: Table2,
+                      value: discoveries.reduce((sum, d) => {
+                        const wb = d.workbooks[0];
+                        return sum + (wb ? getWorkbookStats(wb).worksheetCount : 0);
+                      }, 0),
+                    },
+                    {
+                      label: "In Dashboard / Orphaned",
+                      icon: ListFilter,
+                      value: `${discoveries.reduce((sum, d) => {
+                        const wb = d.workbooks[0];
+                        return sum + (wb ? getWorkbookStats(wb).inDashboardCount : 0);
+                      }, 0)} / ${discoveries.reduce((sum, d) => {
+                        const wb = d.workbooks[0];
+                        return sum + (wb ? getWorkbookStats(wb).orphanedCount : 0);
+                      }, 0)}`,
+                    },
+                  ].map((tile) => (
+                    <div
+                      key={tile.label}
+                      className="rounded-lg border border-border bg-muted/40 p-3 flex flex-col gap-1.5"
+                    >
+                      <div className="flex items-center gap-1.5 text-muted-foreground">
+                        <tile.icon className="w-3.5 h-3.5" />
+                        <span className="text-xs">{tile.label}</span>
+                      </div>
+                      <span className="text-lg font-semibold tabular-nums">{tile.value}</span>
                     </div>
-                    <div>
-                      <p className="text-muted-foreground">Total Dashboards</p>
-                      <p className="font-bold">
-                        {discoveries.reduce((sum, d) => {
-                          const wb = d.workbooks[0];
-                          return sum + (wb ? getWorkbookStats(wb).dashboardCount : 0);
-                        }, 0)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Total Worksheets</p>
-                      <p className="font-bold">
-                        {discoveries.reduce((sum, d) => {
-                          const wb = d.workbooks[0];
-                          return sum + (wb ? getWorkbookStats(wb).worksheetCount : 0);
-                        }, 0)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">In Dashboard / Orphaned</p>
-                      <p className="font-bold">
-                        {discoveries.reduce((sum, d) => {
-                          const wb = d.workbooks[0];
-                          return sum + (wb ? getWorkbookStats(wb).inDashboardCount : 0);
-                        }, 0)}
-                        {" / "}
-                        {discoveries.reduce((sum, d) => {
-                          const wb = d.workbooks[0];
-                          return sum + (wb ? getWorkbookStats(wb).orphanedCount : 0);
-                        }, 0)}
-                      </p>
-                    </div>
-                  </div>
+                  ))}
                 </div>
 
                 {/* Per-workbook detail */}
@@ -1143,94 +1185,132 @@ const PreMigrationAnalysis = () => {
                   const wb = discovery.workbooks[0];
                   if (!wb) return null;
                   const stats = getWorkbookStats(wb);
-                  const visualTypeEntries = Object.entries(stats.visualTypeCounts);
+                  const visualTypeEntries = Object.entries(stats.visualTypeCounts).sort(
+                    (a, b) => b[1] - a[1]
+                  );
+                  const maxVisualCount = Math.max(1, ...visualTypeEntries.map(([, c]) => c));
 
                   return (
-                    <div key={idx} className="p-4 bg-muted rounded-lg space-y-5">
-                      <h3 className="font-semibold">{wb.workbook_metadata.name}</h3>
-
-                      <div>
-                        <p className="text-xs font-semibold text-muted-foreground mb-2">Data Model</p>
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                          <div>
-                            <p className="text-muted-foreground">Datasources</p>
-                            <p className="font-bold">
-                              {stats.datasources.length}
-                              {stats.datasources.length > 0 &&
-                                ` (${stats.datasources.map((d: any) => d.caption || d.name).join(", ")})`}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Tables</p>
-                            <p className="font-bold">{stats.tableCount}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Relationships</p>
-                            <p className="font-bold">{stats.relationshipCount}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Joins</p>
-                            <p className="font-bold">{stats.joinCount}</p>
-                          </div>
+                    <div key={idx} className="rounded-xl border border-border bg-card p-4 space-y-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <Boxes className="w-4 h-4 text-primary" />
                         </div>
+                        <h3 className="font-semibold">{wb.workbook_metadata.name}</h3>
                       </div>
 
-                      <div>
-                        <p className="text-xs font-semibold text-muted-foreground mb-2">Fields & Measures</p>
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                          <div>
-                            <p className="text-muted-foreground">Dimensions</p>
-                            <p className="font-bold">{stats.dimensionCount}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Measures</p>
-                            <p className="font-bold">{stats.measureCount}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Calculated Fields</p>
-                            <p className="font-bold">{stats.calculatedFieldCount}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">KPIs</p>
-                            <p className="font-bold">{stats.kpiCount}</p>
-                          </div>
-                        </div>
-                      </div>
+                      <Accordion
+                        type="multiple"
+                        defaultValue={[`model-${idx}`, `fields-${idx}`, `visuals-${idx}`, `filters-${idx}`]}
+                        className="space-y-1"
+                      >
+                        <AccordionItem value={`model-${idx}`} className="border-b-0">
+                          <AccordionTrigger className="py-2 text-sm font-medium hover:no-underline">
+                            <span className="flex items-center gap-2">
+                              <Database className="w-3.5 h-3.5 text-muted-foreground" />
+                              Data Model
+                            </span>
+                          </AccordionTrigger>
+                          <AccordionContent className="pb-1">
+                            <DiscoveryMetricRow
+                              icon={Database}
+                              label={
+                                stats.datasources.length > 0
+                                  ? `Datasources (${stats.datasources
+                                      .map((d: any) => d.caption || d.name)
+                                      .join(", ")})`
+                                  : "Datasources"
+                              }
+                              value={stats.datasources.length}
+                            />
+                            <DiscoveryMetricRow icon={Table2} label="Tables" value={stats.tableCount} />
+                            <DiscoveryMetricRow icon={Link2} label="Relationships" value={stats.relationshipCount} />
+                            <DiscoveryMetricRow icon={Link2} label="Joins" value={stats.joinCount} />
+                          </AccordionContent>
+                        </AccordionItem>
 
-                      <div>
-                        <p className="text-xs font-semibold text-muted-foreground mb-2">Visuals</p>
-                        <div className="grid grid-cols-2 gap-2 text-sm mb-2">
-                          <div>
-                            <p className="text-muted-foreground">Visual Types Used</p>
-                            <p className="font-bold">{visualTypeEntries.length}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Total Visuals</p>
-                            <p className="font-bold">{stats.totalVisuals}</p>
-                          </div>
-                        </div>
-                        {visualTypeEntries.length > 0 && (
-                          <div className="space-y-1">
-                            {visualTypeEntries.map(([type, count]) => (
-                              <div key={type} className="flex items-center justify-between text-sm">
-                                <span className="text-muted-foreground">{type}</span>
-                                <span className="font-bold">{count}</span>
+                        <AccordionItem value={`fields-${idx}`} className="border-b-0">
+                          <AccordionTrigger className="py-2 text-sm font-medium hover:no-underline">
+                            <span className="flex items-center gap-2">
+                              <Calculator className="w-3.5 h-3.5 text-muted-foreground" />
+                              Fields & Measures
+                            </span>
+                          </AccordionTrigger>
+                          <AccordionContent className="pb-1">
+                            <DiscoveryMetricRow icon={Gauge} label="Dimensions" value={stats.dimensionCount} />
+                            <DiscoveryMetricRow icon={Calculator} label="Measures" value={stats.measureCount} />
+                            <DiscoveryMetricRow
+                              icon={Calculator}
+                              label="Calculated Fields"
+                              value={stats.calculatedFieldCount}
+                            />
+                            <DiscoveryMetricRow icon={Gauge} label="KPIs" value={stats.kpiCount} />
+                          </AccordionContent>
+                        </AccordionItem>
+
+                        <AccordionItem value={`visuals-${idx}`} className="border-b-0">
+                          <AccordionTrigger className="py-2 text-sm font-medium hover:no-underline">
+                            <span className="flex items-center gap-2">
+                              <BarChart3 className="w-3.5 h-3.5 text-muted-foreground" />
+                              Visuals
+                            </span>
+                          </AccordionTrigger>
+                          <AccordionContent className="pb-1 space-y-2">
+                            <DiscoveryMetricRow
+                              icon={BarChart3}
+                              label="Visual Types Used"
+                              value={visualTypeEntries.length}
+                            />
+                            <DiscoveryMetricRow icon={BarChart3} label="Total Visuals" value={stats.totalVisuals} />
+                            {visualTypeEntries.length > 0 && (
+                              <div className="space-y-1.5 pt-1">
+                                {visualTypeEntries.map(([type, count]) => (
+                                  <div key={type} className="space-y-0.5">
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="text-muted-foreground">{type}</span>
+                                      <span className="font-semibold text-foreground">{count}</span>
+                                    </div>
+                                    <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                                      <div
+                                        className="h-full rounded-full bg-primary"
+                                        style={{ width: `${(count / maxVisualCount) * 100}%` }}
+                                      />
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                            )}
+                          </AccordionContent>
+                        </AccordionItem>
 
-                      <div>
-                        <p className="text-xs font-semibold text-muted-foreground mb-2">Filters</p>
-                        <div className="text-sm">
-                          <p className="text-muted-foreground">Filters Applied</p>
-                          <p className="font-bold">
-                            {stats.filterNames.length}
-                            {stats.filterNames.length > 0 && ` (${stats.filterNames.join(", ")})`}
-                          </p>
-                        </div>
-                      </div>
+                        <AccordionItem value={`filters-${idx}`} className="border-b-0">
+                          <AccordionTrigger className="py-2 text-sm font-medium hover:no-underline">
+                            <span className="flex items-center gap-2">
+                              <ListFilter className="w-3.5 h-3.5 text-muted-foreground" />
+                              Filters
+                            </span>
+                          </AccordionTrigger>
+                          <AccordionContent className="pb-1">
+                            <DiscoveryMetricRow
+                              icon={ListFilter}
+                              label="Filters Applied"
+                              value={stats.filterNames.length}
+                            />
+                            {stats.filterNames.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5 pt-1">
+                                {stats.filterNames.map((name, fIdx) => (
+                                  <span
+                                    key={fIdx}
+                                    className="text-xs bg-muted text-muted-foreground rounded-full px-2 py-0.5"
+                                  >
+                                    {name}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </AccordionContent>
+                        </AccordionItem>
+                      </Accordion>
                     </div>
                   );
                 })}
