@@ -8,7 +8,7 @@ interface AuthContextType {
   checkAuth: () => Promise<boolean>;
   logout: () => void;
 }
-
+ 
 const BACKEND_BASE_URL = "https://accesstokens-aecjbzaqaqcuh6bd.eastus-01.azurewebsites.net";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
