@@ -797,185 +797,657 @@
 
 // export default PreMigrationAnalysis;
 
-import { useEffect, useMemo, useRef, useState } from "react";
+// import { useEffect, useMemo, useRef, useState } from "react";
+// import { useLocation, useNavigate } from "react-router-dom";
+// import {
+//   ArrowLeft,
+//   ChevronRight,
+//   Loader2,
+//   AlertTriangle,
+//   Database,
+//   Activity,
+//   Boxes,
+//   RefreshCw,
+//   ArrowUpRight,
+//   Gauge,
+//   TrendingUp,
+//   TrendingDown,
+// } from "lucide-react";
+// import AppLayout from "@/components/layout/AppLayout";
+// import { Button } from "@/components/ui/button";
+// import {
+//   Table,
+//   TableBody,
+//   TableCell,
+//   TableHead,
+//   TableHeader,
+//   TableRow,
+// } from "@/components/ui/table";
+// import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+// import { useToast } from "@/hooks/use-toast";
+// import { analysisApi, AnalysisApiError } from "@/api/analysisApi";
+// import { FullAnalysisResponse, WorkbookBundle } from "@/types/analysis";
+// import { TreeNode } from "@/types/migration";
+// import IconTile from "@/components/analysis/IconTile";
+// import ClassificationBadge from "@/components/analysis/ClassificationBadge";
+// import ScoreGauge from "@/components/analysis/ScoreGauge";
+// import WorkbookAnalysisPanel from "@/components/analysis/WorkbookAnalysisPanel";
+// import WorkbookInfoPopover from "@/components/analysis/WorkbookInfoPopover";
+// import InsightCard from "@/components/analysis/InsightCard";
+// import ArtifactsCountModal from "@/components/analysis/Artifactscountmodal";
+// import {
+//   Copy,
+//   GitBranch,
+//   Layers,
+//   ShieldAlert,
+//   LayoutGrid as LayoutGridIcon,
+//   SlidersHorizontal as SlidersHorizontalIcon,
+//   ListFilter as ListFilterIcon,
+// } from "lucide-react";
+
+// const TABLEAU_BACKEND_URL = "https://frame-premigration-test-cabfgrazgacqgzf9.eastus-01.azurewebsites.net";
+
+// interface NavState {
+//   workbookIds: string[];
+//   workbookNames: string[];
+// }
+
+// function average(nums: number[]): number {
+//   if (nums.length === 0) return 0;
+//   return Math.round(nums.reduce((a, b) => a + b, 0) / nums.length);
+// }
+
+// const underlineTabsList = "h-auto bg-transparent p-0 border-b border-border rounded-none justify-start gap-6";
+// const underlineTabsTrigger =
+//   "px-0 py-2.5 rounded-none bg-transparent shadow-none data-[state=active]:bg-transparent data-[state=active]:shadow-none border-b-2 border-transparent data-[state=active]:border-primary text-muted-foreground data-[state=active]:text-foreground font-medium";
+
+// const PreMigrationAnalysis = () => {
+//   const location = useLocation();
+//   const navigate = useNavigate();
+//   const { toast } = useToast();
+
+//   const navState = location.state as NavState | null;
+
+//   const [isLoading, setIsLoading] = useState(true);
+//   const [error, setError] = useState<string | null>(null);
+//   const [result, setResult] = useState<FullAnalysisResponse | null>(null);
+//   const [activeWorkbookId, setActiveWorkbookId] = useState<string | null>(null);
+//   const [isPreparingMigration, setIsPreparingMigration] = useState(false);
+//   const [showArtifactsModal, setShowArtifactsModal] = useState(false);
+//   const workbookDetailRef = useRef<HTMLDivElement>(null);
+
+//   const runAnalysis = async () => {
+//     const token = sessionStorage.getItem("tableau_api_token");
+//     if (!token) {
+//       toast({ title: "Session expired", description: "Please sign in again", variant: "destructive" });
+//       navigate("/");
+//       return;
+//     }
+
+//     setIsLoading(true);
+//     setError(null);
+
+//     try {
+//       const response = await analysisApi.analyzeWorkbooks({
+//         apiToken: token,
+//         workbookIds: navState?.workbookIds,
+//       });
+//       setResult(response);
+//       const firstWorkbook = response.metadata.workbooks[0];
+//       setActiveWorkbookId(firstWorkbook?.workbook_metadata.id ?? null);
+//       // Show artifacts modal when workbook is selected
+//       if (firstWorkbook) {
+//         setTimeout(() => setShowArtifactsModal(true), 500);
+//       }
+//     } catch (err) {
+//       const message =
+//         err instanceof AnalysisApiError ? err.message : "Something went wrong while analyzing the selected workbooks.";
+//       setError(message);
+//       toast({ title: "Analysis failed", description: message, variant: "destructive" });
+//     } finally {
+//       setIsLoading(false);
+//     }
+//   };
+
+//   useEffect(() => {
+//     if (!navState?.workbookIds || navState.workbookIds.length === 0) {
+//       navigate("/dashboard");
+//       return;
+//     }
+//     runAnalysis();
+//   }, []);
+
+//   const activeWorkbook: WorkbookBundle | null = useMemo(() => {
+//     if (!result || !activeWorkbookId) return null;
+//     return result.metadata.workbooks.find((w) => w.workbook_metadata.id === activeWorkbookId) ?? null;
+//   }, [result, activeWorkbookId]);
+
+//   const usageResult = useMemo(() => {
+//     return result?.usage_analysis.find((u) => u.workbook_id === activeWorkbookId) ?? null;
+//   }, [result, activeWorkbookId]);
+
+//   const complexityResult = useMemo(() => {
+//     return result?.complexity_analysis.find((c) => c.workbook_id === activeWorkbookId) ?? null;
+//   }, [result, activeWorkbookId]);
+
+//   if (isLoading) {
+//     return (
+//       <AppLayout>
+//         <div className="flex items-center justify-center h-screen">
+//           <div className="text-center">
+//             <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
+//             <p className="text-muted-foreground">Analyzing selected workbooks...</p>
+//           </div>
+//         </div>
+//       </AppLayout>
+//     );
+//   }
+
+//   if (error) {
+//     return (
+//       <AppLayout>
+//         <div className="flex items-center justify-center h-screen">
+//           <div className="text-center max-w-md">
+//             <AlertTriangle className="w-12 h-12 text-destructive mx-auto mb-4" />
+//             <h2 className="text-lg font-semibold mb-2">Analysis Failed</h2>
+//             <p className="text-muted-foreground mb-6">{error}</p>
+//             <div className="flex gap-2 justify-center">
+//               <Button variant="outline" onClick={() => navigate("/dashboard")}>
+//                 Back to Dashboard
+//               </Button>
+//               <Button onClick={runAnalysis}>
+//                 <RefreshCw className="w-4 h-4 mr-2" />
+//                 Retry
+//               </Button>
+//             </div>
+//           </div>
+//         </div>
+//       </AppLayout>
+//     );
+//   }
+
+//   if (!result) {
+//     return (
+//       <AppLayout>
+//         <div className="flex items-center justify-center h-screen">
+//           <p className="text-muted-foreground">No analysis data available</p>
+//         </div>
+//       </AppLayout>
+//     );
+//   }
+
+//   return (
+//     <AppLayout>
+//       <div className="space-y-6 pb-12">
+//         {/* Header */}
+//         <div className="flex items-center justify-between">
+//           <div>
+//             <Button
+//               variant="ghost"
+//               size="sm"
+//               onClick={() => navigate("/dashboard")}
+//               className="mb-4 -ml-2"
+//             >
+//               <ArrowLeft className="w-4 h-4 mr-2" />
+//               Back
+//             </Button>
+//             <h1 className="text-3xl font-bold">Pre-Migration Analysis</h1>
+//             <p className="text-muted-foreground mt-1">
+//               Analyzing {result.metadata.workbooks.length} selected workbook
+//               {result.metadata.workbooks.length !== 1 ? "s" : ""}
+//             </p>
+//           </div>
+//           <div className="flex gap-2">
+//             <Button variant="outline" onClick={runAnalysis} size="sm">
+//               <RefreshCw className="w-4 h-4 mr-2" />
+//               Refresh
+//             </Button>
+//           </div>
+//         </div>
+
+//         {/* Workbook Tabs */}
+//         <Tabs value={activeWorkbookId ?? ""} onValueChange={setActiveWorkbookId} className="w-full">
+//           <TabsList className={underlineTabsList}>
+//             {result.metadata.workbooks.map((wb) => (
+//               <TabsTrigger
+//                 key={wb.workbook_metadata.id}
+//                 value={wb.workbook_metadata.id}
+//                 className={underlineTabsTrigger}
+//               >
+//                 <div className="flex items-center gap-2">
+//                   <Boxes className="w-4 h-4" />
+//                   {wb.workbook_metadata.name}
+//                 </div>
+//               </TabsTrigger>
+//             ))}
+//           </TabsList>
+
+//           {result.metadata.workbooks.map((wb) => (
+//             <TabsContent
+//               key={wb.workbook_metadata.id}
+//               value={wb.workbook_metadata.id}
+//               className="space-y-6"
+//               ref={activeWorkbookId === wb.workbook_metadata.id ? workbookDetailRef : null}
+//             >
+//               <div className="flex items-start justify-between">
+//                 <div>
+//                   <h2 className="text-2xl font-bold">{wb.workbook_metadata.name}</h2>
+//                   <p className="text-sm text-muted-foreground mt-1">
+//                     Last updated {new Date(wb.workbook_metadata.updated_at).toLocaleDateString()}
+//                   </p>
+//                 </div>
+//                 <Button
+//                   onClick={() => setShowArtifactsModal(true)}
+//                   variant="outline"
+//                   size="sm"
+//                   className="gap-2"
+//                 >
+//                   <Boxes className="w-4 h-4" />
+//                   View Artifacts Count
+//                 </Button>
+//               </div>
+
+//               {/* Stats Overview */}
+//               {usageResult && complexityResult && (
+//                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+//                   <InsightCard
+//                     title="Popularity"
+//                     value={usageResult.popularity_score}
+//                     icon={<Activity className="w-4 h-4" />}
+//                     badge={<ClassificationBadge classification={usageResult.usage_classification} />}
+//                     tone="default"
+//                   />
+//                   <InsightCard
+//                     title="Complexity"
+//                     value={complexityResult.complexity_score}
+//                     icon={<GitBranch className="w-4 h-4" />}
+//                     badge={<ClassificationBadge classification={complexityResult.complexity_classification} />}
+//                     tone={complexityResult.complexity_score > 70 ? "warning" : "default"}
+//                   />
+//                   <InsightCard
+//                     title="Migration Risk"
+//                     value={average([usageResult.popularity_score, complexityResult.complexity_score])}
+//                     icon={<ShieldAlert className="w-4 h-4" />}
+//                     tone="default"
+//                   />
+//                 </div>
+//               )}
+
+//               {/* Detailed Analysis */}
+//               <WorkbookAnalysisPanel workbook={wb} result={result} />
+//             </TabsContent>
+//           ))}
+//         </Tabs>
+//       </div>
+
+//       {/* Artifacts Count Modal */}
+//       <ArtifactsCountModal
+//         open={showArtifactsModal}
+//         onOpenChange={setShowArtifactsModal}
+//         workbook={activeWorkbook}
+//         workbookName={activeWorkbook?.workbook_metadata.name}
+//       />
+//     </AppLayout>
+//   );
+// };
+
+// export default PreMigrationAnalysis;
+
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
-  ChevronRight,
   Loader2,
   AlertTriangle,
-  Database,
-  Activity,
-  Boxes,
   RefreshCw,
-  ArrowUpRight,
-  Gauge,
-  TrendingUp,
-  TrendingDown,
+  Boxes,
+  ArrowRight,
 } from "lucide-react";
 import AppLayout from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { analysisApi, AnalysisApiError } from "@/api/analysisApi";
-import { FullAnalysisResponse, WorkbookBundle } from "@/types/analysis";
-import { TreeNode } from "@/types/migration";
-import IconTile from "@/components/analysis/IconTile";
-import ClassificationBadge from "@/components/analysis/ClassificationBadge";
-import ScoreGauge from "@/components/analysis/ScoreGauge";
-import WorkbookAnalysisPanel from "@/components/analysis/WorkbookAnalysisPanel";
-import WorkbookInfoPopover from "@/components/analysis/WorkbookInfoPopover";
-import InsightCard from "@/components/analysis/InsightCard";
-import ArtifactsCountModal from "@/components/analysis/Artifactscountmodal";
-import {
-  Copy,
-  GitBranch,
-  Layers,
-  ShieldAlert,
-  LayoutGrid as LayoutGridIcon,
-  SlidersHorizontal as SlidersHorizontalIcon,
-  ListFilter as ListFilterIcon,
-} from "lucide-react";
-
-const TABLEAU_BACKEND_URL = "https://frame-premigration-test-cabfgrazgacqgzf9.eastus-01.azurewebsites.net";
+import ArtifactsCountModal from "@/components/analysis/ArtifactsCountModal";
+import { discoveryApi, DiscoveryResponse } from "@/api/discoveryApi";
+import { analysisApi } from "@/api/analysisApi";
 
 interface NavState {
   workbookIds: string[];
   workbookNames: string[];
 }
 
-function average(nums: number[]): number {
-  if (nums.length === 0) return 0;
-  return Math.round(nums.reduce((a, b) => a + b, 0) / nums.length);
-}
-
-const underlineTabsList = "h-auto bg-transparent p-0 border-b border-border rounded-none justify-start gap-6";
-const underlineTabsTrigger =
-  "px-0 py-2.5 rounded-none bg-transparent shadow-none data-[state=active]:bg-transparent data-[state=active]:shadow-none border-b-2 border-transparent data-[state=active]:border-primary text-muted-foreground data-[state=active]:text-foreground font-medium";
-
-const PreMigrationAnalysis = () => {
+/**
+ * Two-stage flow:
+ * 1. STAGE 1: Discovery (show artifacts)
+ * 2. STAGE 2: Analysis (detailed insights)
+ */
+function PreMigrationDiscoveryFirst() {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
 
   const navState = location.state as NavState | null;
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<FullAnalysisResponse | null>(null);
-  const [activeWorkbookId, setActiveWorkbookId] = useState<string | null>(null);
-  const [isPreparingMigration, setIsPreparingMigration] = useState(false);
+  // ========== STAGE 1: DISCOVERY ==========
+  const [stage, setStage] = useState<"discovery" | "analysis">("discovery");
+  const [discoveryLoading, setDiscoveryLoading] = useState(true);
+  const [discoveryError, setDiscoveryError] = useState<string | null>(null);
+  const [discoveries, setDiscoveries] = useState<DiscoveryResponse[]>([]);
+  const [activeDiscoveryIndex, setActiveDiscoveryIndex] = useState(0);
   const [showArtifactsModal, setShowArtifactsModal] = useState(false);
-  const workbookDetailRef = useRef<HTMLDivElement>(null);
 
-  const runAnalysis = async () => {
+  // ========== STAGE 2: ANALYSIS ==========
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [analysisResults, setAnalysisResults] = useState<any>(null);
+
+  // ========== STAGE 1: Fetch Workbook Discovery (Artifacts) ==========
+  const fetchDiscovery = async () => {
     const token = sessionStorage.getItem("tableau_api_token");
     if (!token) {
-      toast({ title: "Session expired", description: "Please sign in again", variant: "destructive" });
+      toast({
+        title: "Session expired",
+        description: "Please sign in again",
+        variant: "destructive",
+      });
       navigate("/");
       return;
     }
 
-    setIsLoading(true);
-    setError(null);
+    setDiscoveryLoading(true);
+    setDiscoveryError(null);
 
     try {
-      const response = await analysisApi.analyzeWorkbooks({
-        apiToken: token,
-        workbookIds: navState?.workbookIds,
-      });
-      setResult(response);
-      const firstWorkbook = response.metadata.workbooks[0];
-      setActiveWorkbookId(firstWorkbook?.workbook_metadata.id ?? null);
-      // Show artifacts modal when workbook is selected
-      if (firstWorkbook) {
+      // Call /discovery for each workbook
+      const discoveryPromises = navState?.workbookIds?.map((workbookId) =>
+        discoveryApi.getWorkbookDiscovery({
+          apiToken: token,
+          workbookIds: [workbookId],
+          siteContentUrl: "default",
+        })
+      ) || [];
+
+      const results = await Promise.all(discoveryPromises);
+      setDiscoveries(results);
+
+      // Auto-show artifacts modal for first workbook
+      if (results.length > 0) {
         setTimeout(() => setShowArtifactsModal(true), 500);
       }
+
+      toast({
+        title: "Discovery complete",
+        description: `Found ${results.length} workbook${results.length !== 1 ? "s" : ""}`,
+      });
     } catch (err) {
-      const message =
-        err instanceof AnalysisApiError ? err.message : "Something went wrong while analyzing the selected workbooks.";
-      setError(message);
-      toast({ title: "Analysis failed", description: message, variant: "destructive" });
+      const message = err instanceof Error ? err.message : "Failed to fetch workbook discovery";
+      setDiscoveryError(message);
+      toast({
+        title: "Discovery failed",
+        description: message,
+        variant: "destructive",
+      });
     } finally {
-      setIsLoading(false);
+      setDiscoveryLoading(false);
     }
   };
 
+  // ========== STAGE 2: Run Analysis ==========
+  const handleProceedToAnalysis = async () => {
+    const token = sessionStorage.getItem("tableau_api_token");
+    if (!token) {
+      toast({
+        title: "Session expired",
+        description: "Please sign in again",
+        variant: "destructive",
+      });
+      navigate("/");
+      return;
+    }
+
+    setAnalysisLoading(true);
+    setAnalysisError(null);
+
+    try {
+      // Call /analyze endpoint with workbook IDs
+      const result = await analysisApi.analyzeWorkbooks({
+        apiToken: token,
+        workbookIds: navState?.workbookIds,
+        siteContentUrl: "default",
+      });
+
+      setAnalysisResults(result);
+      setStage("analysis");
+
+      toast({
+        title: "Analysis complete",
+        description: "Detailed analysis is ready",
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to run analysis";
+      setAnalysisError(message);
+      toast({
+        title: "Analysis failed",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setAnalysisLoading(false);
+    }
+  };
+
+  // Fetch discovery on mount
   useEffect(() => {
     if (!navState?.workbookIds || navState.workbookIds.length === 0) {
       navigate("/dashboard");
       return;
     }
-    runAnalysis();
+    fetchDiscovery();
   }, []);
 
-  const activeWorkbook: WorkbookBundle | null = useMemo(() => {
-    if (!result || !activeWorkbookId) return null;
-    return result.metadata.workbooks.find((w) => w.workbook_metadata.id === activeWorkbookId) ?? null;
-  }, [result, activeWorkbookId]);
+  const currentDiscovery = discoveries[activeDiscoveryIndex];
+  const currentWorkbook = currentDiscovery?.workbooks[0];
 
-  const usageResult = useMemo(() => {
-    return result?.usage_analysis.find((u) => u.workbook_id === activeWorkbookId) ?? null;
-  }, [result, activeWorkbookId]);
-
-  const complexityResult = useMemo(() => {
-    return result?.complexity_analysis.find((c) => c.workbook_id === activeWorkbookId) ?? null;
-  }, [result, activeWorkbookId]);
-
-  if (isLoading) {
-    return (
-      <AppLayout>
-        <div className="flex items-center justify-center h-screen">
-          <div className="text-center">
-            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
-            <p className="text-muted-foreground">Analyzing selected workbooks...</p>
+  // ========== STAGE 1: DISCOVERY UI ==========
+  if (stage === "discovery") {
+    if (discoveryLoading) {
+      return (
+        <AppLayout>
+          <div className="flex items-center justify-center h-screen">
+            <div className="text-center">
+              <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
+              <p className="text-muted-foreground">Discovering workbook artifacts...</p>
+            </div>
           </div>
-        </div>
-      </AppLayout>
-    );
-  }
+        </AppLayout>
+      );
+    }
 
-  if (error) {
+    if (discoveryError) {
+      return (
+        <AppLayout>
+          <div className="flex items-center justify-center h-screen">
+            <div className="text-center max-w-md">
+              <AlertTriangle className="w-12 h-12 text-destructive mx-auto mb-4" />
+              <h2 className="text-lg font-semibold mb-2">Discovery Failed</h2>
+              <p className="text-muted-foreground mb-6">{discoveryError}</p>
+              <div className="flex gap-2 justify-center">
+                <Button variant="outline" onClick={() => navigate("/dashboard")}>
+                  Back to Dashboard
+                </Button>
+                <Button onClick={fetchDiscovery}>
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Retry
+                </Button>
+              </div>
+            </div>
+          </div>
+        </AppLayout>
+      );
+    }
+
     return (
       <AppLayout>
-        <div className="flex items-center justify-center h-screen">
-          <div className="text-center max-w-md">
-            <AlertTriangle className="w-12 h-12 text-destructive mx-auto mb-4" />
-            <h2 className="text-lg font-semibold mb-2">Analysis Failed</h2>
-            <p className="text-muted-foreground mb-6">{error}</p>
-            <div className="flex gap-2 justify-center">
-              <Button variant="outline" onClick={() => navigate("/dashboard")}>
-                Back to Dashboard
+        <div className="space-y-6 pb-12">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate("/dashboard")}
+                className="mb-4 -ml-2"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back
               </Button>
-              <Button onClick={runAnalysis}>
+              <h1 className="text-3xl font-bold">Discovery: Workbook Artifacts</h1>
+              <p className="text-muted-foreground mt-1">
+                Step 1 of 2: Review what's in your workbooks before analysis
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={fetchDiscovery} size="sm">
                 <RefreshCw className="w-4 h-4 mr-2" />
-                Retry
+                Refresh
               </Button>
             </div>
           </div>
+
+          {/* Progress Indicator */}
+          <div className="flex items-center gap-2">
+            <div className="flex-1 h-1 bg-primary rounded-full"></div>
+            <span className="text-sm font-medium">Discovery</span>
+            <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-xs font-bold">
+              1
+            </div>
+            <div className="flex-1 h-1 bg-muted rounded-full"></div>
+            <span className="text-sm font-medium text-muted-foreground">Analysis</span>
+            <div className="w-8 h-8 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-xs font-bold">
+              2
+            </div>
+          </div>
+
+          {/* Workbook Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {discoveries.map((discovery, index) => {
+              const wb = discovery.workbooks[0];
+              if (!wb) return null;
+
+              const dashboardCount = wb.reports.dashboards?.length || 0;
+              const worksheetCount = wb.reports.worksheets?.length || 0;
+              const datasourceCount = wb.data_model.datasources?.length || 0;
+              const fieldCount =
+                (wb.fields.dimensions?.length || 0) + (wb.fields.measures?.length || 0);
+
+              return (
+                <div
+                  key={wb.workbook_metadata.id}
+                  className={`p-6 rounded-lg border-2 cursor-pointer transition-all ${
+                    activeDiscoveryIndex === index
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:border-primary/50"
+                  }`}
+                  onClick={() => {
+                    setActiveDiscoveryIndex(index);
+                    setTimeout(() => setShowArtifactsModal(true), 100);
+                  }}
+                >
+                  <div className="mb-4">
+                    <h3 className="font-semibold text-lg">{wb.workbook_metadata.name}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Updated {new Date(wb.workbook_metadata.updated_at).toLocaleDateString()}
+                    </p>
+                  </div>
+
+                  {/* Stats Grid */}
+                  <div className="grid grid-cols-2 gap-3 mb-4 p-4 bg-muted/30 rounded-lg">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Dashboards</p>
+                      <p className="text-2xl font-bold">{dashboardCount}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Worksheets</p>
+                      <p className="text-2xl font-bold">{worksheetCount}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Datasources</p>
+                      <p className="text-2xl font-bold">{datasourceCount}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Fields</p>
+                      <p className="text-2xl font-bold">{fieldCount}</p>
+                    </div>
+                  </div>
+
+                  {/* Action Button */}
+                  <Button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveDiscoveryIndex(index);
+                      setTimeout(() => setShowArtifactsModal(true), 100);
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="w-full gap-2"
+                  >
+                    <Boxes className="w-4 h-4" />
+                    View Detailed Artifacts
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Bottom Action */}
+          <div className="flex gap-2 justify-end pt-6 border-t">
+            <Button variant="outline" onClick={() => navigate("/dashboard")}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleProceedToAnalysis}
+              disabled={analysisLoading || discoveries.length === 0}
+              className="gap-2"
+            >
+              {analysisLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Running Analysis...
+                </>
+              ) : (
+                <>
+                  Proceed to Analysis
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </Button>
+          </div>
+
+          {/* Artifacts Modal */}
+          {currentWorkbook && (
+            <ArtifactsCountModal
+              open={showArtifactsModal}
+              onOpenChange={setShowArtifactsModal}
+              workbook={{
+                workbook_metadata: currentWorkbook.workbook_metadata,
+                reports: currentWorkbook.reports,
+                usage: currentWorkbook.usage,
+                data_model: currentWorkbook.data_model,
+                fields: currentWorkbook.fields,
+                kpis: currentWorkbook.kpis,
+                dependencies: currentWorkbook.dependencies,
+                components: currentWorkbook.components,
+                mappings: currentWorkbook.mappings,
+                visuals: currentWorkbook.visuals,
+              }}
+              workbookName={currentWorkbook.workbook_metadata.name}
+            />
+          )}
         </div>
       </AppLayout>
     );
   }
 
-  if (!result) {
-    return (
-      <AppLayout>
-        <div className="flex items-center justify-center h-screen">
-          <p className="text-muted-foreground">No analysis data available</p>
-        </div>
-      </AppLayout>
-    );
-  }
-
+  // ========== STAGE 2: ANALYSIS UI ==========
   return (
     <AppLayout>
       <div className="space-y-6 pb-12">
@@ -985,110 +1457,84 @@ const PreMigrationAnalysis = () => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate("/dashboard")}
+              onClick={() => setStage("discovery")}
               className="mb-4 -ml-2"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Back
+              Back to Discovery
             </Button>
-            <h1 className="text-3xl font-bold">Pre-Migration Analysis</h1>
+            <h1 className="text-3xl font-bold">Detailed Analysis</h1>
             <p className="text-muted-foreground mt-1">
-              Analyzing {result.metadata.workbooks.length} selected workbook
-              {result.metadata.workbooks.length !== 1 ? "s" : ""}
+              Step 2 of 2: AI-powered insights and migration planning
             </p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={runAnalysis} size="sm">
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Refresh
-            </Button>
           </div>
         </div>
 
-        {/* Workbook Tabs */}
-        <Tabs value={activeWorkbookId ?? ""} onValueChange={setActiveWorkbookId} className="w-full">
-          <TabsList className={underlineTabsList}>
-            {result.metadata.workbooks.map((wb) => (
-              <TabsTrigger
-                key={wb.workbook_metadata.id}
-                value={wb.workbook_metadata.id}
-                className={underlineTabsTrigger}
-              >
-                <div className="flex items-center gap-2">
-                  <Boxes className="w-4 h-4" />
-                  {wb.workbook_metadata.name}
-                </div>
-              </TabsTrigger>
-            ))}
-          </TabsList>
+        {/* Progress Indicator */}
+        <div className="flex items-center gap-2">
+          <div className="flex-1 h-1 bg-primary rounded-full"></div>
+          <span className="text-sm font-medium text-muted-foreground">Discovery</span>
+          <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-xs font-bold">
+            ✓
+          </div>
+          <div className="flex-1 h-1 bg-primary rounded-full"></div>
+          <span className="text-sm font-medium">Analysis</span>
+          <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-xs font-bold">
+            2
+          </div>
+        </div>
 
-          {result.metadata.workbooks.map((wb) => (
-            <TabsContent
-              key={wb.workbook_metadata.id}
-              value={wb.workbook_metadata.id}
-              className="space-y-6"
-              ref={activeWorkbookId === wb.workbook_metadata.id ? workbookDetailRef : null}
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold">{wb.workbook_metadata.name}</h2>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Last updated {new Date(wb.workbook_metadata.updated_at).toLocaleDateString()}
-                  </p>
-                </div>
-                <Button
-                  onClick={() => setShowArtifactsModal(true)}
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
-                >
-                  <Boxes className="w-4 h-4" />
-                  View Artifacts Count
-                </Button>
-              </div>
+        {analysisError && (
+          <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+            <AlertTriangle className="w-5 h-5 text-destructive mb-2 inline-block mr-2" />
+            <p className="text-destructive">{analysisError}</p>
+          </div>
+        )}
 
-              {/* Stats Overview */}
-              {usageResult && complexityResult && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <InsightCard
-                    title="Popularity"
-                    value={usageResult.popularity_score}
-                    icon={<Activity className="w-4 h-4" />}
-                    badge={<ClassificationBadge classification={usageResult.usage_classification} />}
-                    tone="default"
-                  />
-                  <InsightCard
-                    title="Complexity"
-                    value={complexityResult.complexity_score}
-                    icon={<GitBranch className="w-4 h-4" />}
-                    badge={<ClassificationBadge classification={complexityResult.complexity_classification} />}
-                    tone={complexityResult.complexity_score > 70 ? "warning" : "default"}
-                  />
-                  <InsightCard
-                    title="Migration Risk"
-                    value={average([usageResult.popularity_score, complexityResult.complexity_score])}
-                    icon={<ShieldAlert className="w-4 h-4" />}
-                    tone="default"
-                  />
-                </div>
-              )}
+        {/* Analysis Results Summary */}
+        {analysisResults && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-6 rounded-lg border border-border bg-card">
+              <h3 className="font-semibold mb-2">Workbooks Analyzed</h3>
+              <p className="text-3xl font-bold text-primary">
+                {analysisResults.metadata?.workbooks?.length || 0}
+              </p>
+            </div>
+            <div className="p-6 rounded-lg border border-border bg-card">
+              <h3 className="font-semibold mb-2">Complexity</h3>
+              <p className="text-3xl font-bold text-primary">
+                {analysisResults.complexity_analysis?.[0]?.complexity_score || "N/A"}
+              </p>
+            </div>
+            <div className="p-6 rounded-lg border border-border bg-card">
+              <h3 className="font-semibold mb-2">Usage Score</h3>
+              <p className="text-3xl font-bold text-primary">
+                {analysisResults.usage_analysis?.[0]?.popularity_score || "N/A"}
+              </p>
+            </div>
+          </div>
+        )}
 
-              {/* Detailed Analysis */}
-              <WorkbookAnalysisPanel workbook={wb} result={result} />
-            </TabsContent>
-          ))}
-        </Tabs>
+        {/* Detailed Content */}
+        <div className="p-6 rounded-lg border border-border bg-card">
+          <h2 className="text-xl font-semibold mb-4">Analysis Results</h2>
+          <pre className="bg-muted p-4 rounded overflow-auto max-h-96 text-sm">
+            {JSON.stringify(analysisResults, null, 2)}
+          </pre>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-2 justify-end border-t pt-6">
+          <Button variant="outline" onClick={() => setStage("discovery")}>
+            Back to Discovery
+          </Button>
+          <Button onClick={() => navigate("/dashboard")}>
+            Complete
+          </Button>
+        </div>
       </div>
-
-      {/* Artifacts Count Modal */}
-      <ArtifactsCountModal
-        open={showArtifactsModal}
-        onOpenChange={setShowArtifactsModal}
-        workbook={activeWorkbook}
-        workbookName={activeWorkbook?.workbook_metadata.name}
-      />
     </AppLayout>
   );
-};
+}
 
-export default PreMigrationAnalysis;
+export default PreMigrationDiscoveryFirst;
