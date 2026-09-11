@@ -834,7 +834,7 @@ import ScoreGauge from "@/components/analysis/ScoreGauge";
 import WorkbookAnalysisPanel from "@/components/analysis/WorkbookAnalysisPanel";
 import WorkbookInfoPopover from "@/components/analysis/WorkbookInfoPopover";
 import InsightCard from "@/components/analysis/InsightCard";
-import ArtifactsCountModal from "@/components/analysis/ArtifactsCountModal";
+import ArtifactsCountModal from "@/components/analysis/Artifactscountmodal";
 import {
   Copy,
   GitBranch,
