@@ -777,6 +777,77 @@ const PreMigrationAnalysis = () => {
     }
   };
 
+  /** Pulls every stat we show in the discovery popup out of one workbook's
+   * discovery payload — counts, names, and a per-visual-type tally (how many
+   * times each visual type — Bar, Pie, Area, etc. — appears on a dashboard),
+   * not just a unique-type count. */
+  type WorkbookDiscovery = DiscoveryResponse["workbooks"][number];
+  const getWorkbookStats = (wb: WorkbookDiscovery) => {
+    const dashboards = wb.reports?.dashboards ?? [];
+    const worksheets = wb.reports?.worksheets ?? [];
+
+    // A worksheet counts as "in dashboard" if any dashboard's
+    // worksheets_contained list references it by name.
+    const inDashboardNames = new Set(
+      dashboards.flatMap((d: any) => d.worksheets_contained ?? [])
+    );
+    const inDashboardCount = worksheets.filter((w) => inDashboardNames.has(w.name)).length;
+    const orphanedCount = worksheets.length - inDashboardCount;
+
+    const datasources = wb.data_model?.datasources ?? [];
+    // The tables array can contain more than one entry per physical table
+    // (a connection-level entry and a schema/columns-level entry) — count
+    // distinct table names rather than raw array length.
+    const tableCount = new Set(
+      (wb.data_model?.tables ?? []).map((t: any) => t.name).filter(Boolean)
+    ).size;
+    const relationshipCount = wb.data_model?.relationships?.length ?? 0;
+    const joinCount = wb.data_model?.joins?.length ?? 0;
+
+    const dimensionCount = wb.fields?.dimensions?.length ?? 0;
+    const measureCount = wb.fields?.measures?.length ?? 0;
+    const calculatedFieldCount = wb.fields?.calculated_fields?.length ?? 0;
+    const kpiCount = wb.kpis?.length ?? 0;
+
+    // Per-visual-type tally, sourced from `visuals.dashboards[].visuals[]`.
+    // This is the *resolved* type (visual_type) — components.worksheets[].mark_type
+    // is frequently just "Automatic" and isn't a real chart type. Only visuals
+    // that actually sit on a dashboard are counted, so this naturally excludes
+    // orphaned worksheets from the total.
+    const visualTypeCounts: Record<string, number> = {};
+    const dashboardVisualGroups = (wb.visuals?.dashboards ?? []) as any[];
+    dashboardVisualGroups.forEach((group) => {
+      (group?.visuals ?? []).forEach((v: any) => {
+        const type = v?.visual_type || v?.mark_type;
+        if (!type) return;
+        visualTypeCounts[type] = (visualTypeCounts[type] || 0) + 1;
+      });
+    });
+    const totalVisuals = Object.values(visualTypeCounts).reduce((a, b) => a + b, 0);
+
+    const filterNames = ((wb.components?.filters ?? []) as any[]).map(
+      (f) => f?.column || f?.name || f?.field || f?.caption || "Unnamed filter"
+    );
+
+    return {
+      dashboardCount: dashboards.length,
+      worksheetCount: worksheets.length,
+      inDashboardCount,
+      orphanedCount,
+      datasources,
+      tableCount,
+      relationshipCount,
+      joinCount,
+      dimensionCount,
+      measureCount,
+      calculatedFieldCount,
+      kpiCount,
+      visualTypeCounts,
+      totalVisuals,
+      filterNames,
+    };
+  };
+
   const runAnalysis = async () => {
     const token = sessionStorage.getItem("tableau_api_token");
     if (!token) {
@@ -1012,9 +1083,9 @@ const PreMigrationAnalysis = () => {
         </div>
 
         <Dialog open={showDiscoveryPopup} onOpenChange={setShowDiscoveryPopup}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Workbook Artifacts</DialogTitle>
+              <DialogTitle>Workbook Artifacts Summary</DialogTitle>
               <DialogDescription>Quick overview of what we found</DialogDescription>
             </DialogHeader>
 
@@ -1023,30 +1094,140 @@ const PreMigrationAnalysis = () => {
                 <Loader2 className="w-6 h-6 animate-spin text-primary" />
               </div>
             ) : discoveries.length > 0 ? (
-              <div className="space-y-4">
+              <div className="space-y-6">
+                {/* Overview across all selected workbooks */}
+                <div>
+                  <h3 className="text-sm font-semibold mb-2">Overview</h3>
+                  <div className="grid grid-cols-2 gap-2 text-sm pl-2">
+                    <div>
+                      <p className="text-muted-foreground">Total Workbooks</p>
+                      <p className="font-bold">{discoveries.length}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Total Dashboards</p>
+                      <p className="font-bold">
+                        {discoveries.reduce((sum, d) => {
+                          const wb = d.workbooks[0];
+                          return sum + (wb ? getWorkbookStats(wb).dashboardCount : 0);
+                        }, 0)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Total Worksheets</p>
+                      <p className="font-bold">
+                        {discoveries.reduce((sum, d) => {
+                          const wb = d.workbooks[0];
+                          return sum + (wb ? getWorkbookStats(wb).worksheetCount : 0);
+                        }, 0)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">In Dashboard / Orphaned</p>
+                      <p className="font-bold">
+                        {discoveries.reduce((sum, d) => {
+                          const wb = d.workbooks[0];
+                          return sum + (wb ? getWorkbookStats(wb).inDashboardCount : 0);
+                        }, 0)}
+                        {" / "}
+                        {discoveries.reduce((sum, d) => {
+                          const wb = d.workbooks[0];
+                          return sum + (wb ? getWorkbookStats(wb).orphanedCount : 0);
+                        }, 0)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Per-workbook detail */}
                 {discoveries.map((discovery, idx) => {
                   const wb = discovery.workbooks[0];
                   if (!wb) return null;
+                  const stats = getWorkbookStats(wb);
+                  const visualTypeEntries = Object.entries(stats.visualTypeCounts);
+
                   return (
-                    <div key={idx} className="p-4 bg-muted rounded-lg space-y-2">
+                    <div key={idx} className="p-4 bg-muted rounded-lg space-y-5">
                       <h3 className="font-semibold">{wb.workbook_metadata.name}</h3>
-                      <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div>
-                          <p className="text-muted-foreground">Dashboards</p>
-                          <p className="font-bold">{wb.reports.dashboards?.length || 0}</p>
+
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground mb-2">Data Model</p>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div>
+                            <p className="text-muted-foreground">Datasources</p>
+                            <p className="font-bold">
+                              {stats.datasources.length}
+                              {stats.datasources.length > 0 &&
+                                ` (${stats.datasources.map((d: any) => d.caption || d.name).join(", ")})`}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Tables</p>
+                            <p className="font-bold">{stats.tableCount}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Relationships</p>
+                            <p className="font-bold">{stats.relationshipCount}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Joins</p>
+                            <p className="font-bold">{stats.joinCount}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-muted-foreground">Worksheets</p>
-                          <p className="font-bold">{wb.reports.worksheets?.length || 0}</p>
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground mb-2">Fields & Measures</p>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div>
+                            <p className="text-muted-foreground">Dimensions</p>
+                            <p className="font-bold">{stats.dimensionCount}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Measures</p>
+                            <p className="font-bold">{stats.measureCount}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Calculated Fields</p>
+                            <p className="font-bold">{stats.calculatedFieldCount}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">KPIs</p>
+                            <p className="font-bold">{stats.kpiCount}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-muted-foreground">Datasources</p>
-                          <p className="font-bold">{wb.data_model.datasources?.length || 0}</p>
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground mb-2">Visuals</p>
+                        <div className="grid grid-cols-2 gap-2 text-sm mb-2">
+                          <div>
+                            <p className="text-muted-foreground">Visual Types Used</p>
+                            <p className="font-bold">{visualTypeEntries.length}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Total Visuals</p>
+                            <p className="font-bold">{stats.totalVisuals}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-muted-foreground">Fields</p>
+                        {visualTypeEntries.length > 0 && (
+                          <div className="space-y-1">
+                            {visualTypeEntries.map(([type, count]) => (
+                              <div key={type} className="flex items-center justify-between text-sm">
+                                <span className="text-muted-foreground">{type}</span>
+                                <span className="font-bold">{count}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground mb-2">Filters</p>
+                        <div className="text-sm">
+                          <p className="text-muted-foreground">Filters Applied</p>
                           <p className="font-bold">
-                            {(wb.fields.dimensions?.length || 0) + (wb.fields.measures?.length || 0)}
+                            {stats.filterNames.length}
+                            {stats.filterNames.length > 0 && ` (${stats.filterNames.join(", ")})`}
                           </p>
                         </div>
                       </div>
