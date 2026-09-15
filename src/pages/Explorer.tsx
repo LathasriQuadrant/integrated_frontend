@@ -120,7 +120,8 @@ const Explorer = () => {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ api_token: token }),
+          // body: JSON.stringify({ api_token: token }), #change 2
+          body: JSON.stringify({ auth_token: token.auth_token, site_id: token.site_id }),
         },
       );
 
@@ -145,7 +146,10 @@ const Explorer = () => {
 
   // ---------------- Migration Steps ----------------
   const runMigrationSteps = async (workbookId: string, workbookName: string) => {
-    const token = sessionStorage.getItem("tableau_api_token");
+    // const token = sessionStorage.getItem("tableau_api_token");
+    // if (!token) { #change 3
+    const stored = sessionStorage.getItem("tableau_api_token");
+    const token = stored ? JSON.parse(stored) : null;
     if (!token) {
       toast({ title: "Session expired", description: "Please sign in again", variant: "destructive" });
       navigate("/");
@@ -156,7 +160,8 @@ const Explorer = () => {
     const dlRes = await fetch(`${BASE}/download_workbook`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ api_token: token, workbook_id: workbookId, file_name: `${workbookName}.twbx` }),
+      // body: JSON.stringify({ api_token: token, workbook_id: workbookId, file_name: `${workbookName}.twbx` }), #change 4
+      body: JSON.stringify({ auth_token: token.auth_token, site_id: token.site_id, workbook_id: workbookId, file_name: `${workbookName}.twbx` }),
     });
     if (!dlRes.ok) throw new Error("Failed to download workbook");
     const dlData = await dlRes.json();
@@ -266,7 +271,10 @@ const Explorer = () => {
   const handleAnalyzeSelected = () => {
     if (analysisSelection.size === 0 || sourceId !== "tableau") return;
 
-    const token = sessionStorage.getItem("tableau_api_token");
+    // const token = sessionStorage.getItem("tableau_api_token");
+    // if (!token) { #change1
+    const stored = sessionStorage.getItem("tableau_api_token");
+    const token = stored ? JSON.parse(stored) : null;
     if (!token) {
       toast({ title: "Session expired", description: "Please sign in again", variant: "destructive" });
       navigate("/");
