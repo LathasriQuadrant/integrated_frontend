@@ -51,8 +51,11 @@ function PreMigrationAnalysisWithDiscovery() {
     try {
       // Call /discovery endpoint for each workbook
       const discoveryPromises = navState?.workbookIds?.map((workbookId) =>
+        // discoveryApi.getWorkbookDiscovery({
+        //   apiToken: token, #change 1
         discoveryApi.getWorkbookDiscovery({
-          apiToken: token,
+          authToken: token.auth_token,
+          siteId: token.site_id,
           workbookIds: [workbookId],
           siteContentUrl: "default",
         })
