@@ -116,16 +116,22 @@ const TableauAuthModal = ({ isOpen, onSuccess, onCancel }: TableauAuthModalProps
 
       sessionStorage.setItem("tableau_tree", JSON.stringify(tableauTree));
 
-      setAuthState("success");
+      // setAuthState("success");
 
+      // toast({
+      //   title: "Signed in successfully",
+      //   description: "Tableau projects loaded",
+      // });
+
+      // setTimeout(() => {
+      //   onSuccess();
+      // }, 700); #change 1
       toast({
-        title: "Signed in successfully",
-        description: "Tableau projects loaded",
+          title: "Signed in successfully",
+          description: "Tableau projects loaded",
       });
 
-      setTimeout(() => {
-        onSuccess();
-      }, 700);
+      onSuccess();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Something went wrong";
 
@@ -141,7 +147,13 @@ const TableauAuthModal = ({ isOpen, onSuccess, onCancel }: TableauAuthModalProps
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onCancel()}>
+    // <Dialog open={isOpen} onOpenChange={(open) => !open && onCancel()}> #change 2
+<Dialog
+  open={isOpen}
+  onOpenChange={(open) => {
+    if (!open && authState === "idle") onCancel();
+  }}
+>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
