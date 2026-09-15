@@ -15,7 +15,9 @@
 /** Request body for POST /analyze (FullAnalyzeRequest extends DiscoveryRequest). */
 export interface AnalyzeRequest {
   // Auth: EITHER api_token (reuse existing Tableau session) OR username+password.
-  api_token?: string;
+  // api_token?: string; #change 1
+  auth_token?: string;
+  site_id?: string;
   username?: string;
   password?: string;
   site_content_url?: string;
