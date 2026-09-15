@@ -66,11 +66,19 @@ const TableauAuthModal = ({ isOpen, onSuccess, onCancel }: TableauAuthModalProps
 
       const signinData = await signinResponse.json();
 
-      if (!signinData.api_token) {
-        throw new Error("API token not returned from server");
+      // if (!signinData.api_token) {
+      //   throw new Error("API token not returned from server");
+      // }
+
+      // sessionStorage.setItem("tableau_api_token", signinData.api_token); #change 1
+      if (!signinData.auth_token || !signinData.site_id) {
+        throw new Error("Auth token not returned from server");
       }
 
-      sessionStorage.setItem("tableau_api_token", signinData.api_token);
+      sessionStorage.setItem(
+        "tableau_api_token",
+        JSON.stringify({ auth_token: signinData.auth_token, site_id: signinData.site_id }),
+      );
       // Set auth flags IMMEDIATELY so AppLayout won't redirect during the slow fetch
       sessionStorage.setItem("local_authenticated", "true");
       sessionStorage.setItem("powerbi_authenticated", "true");
@@ -83,8 +91,12 @@ const TableauAuthModal = ({ isOpen, onSuccess, onCancel }: TableauAuthModalProps
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            api_token: signinData.api_token,
+          // body: JSON.stringify({
+          //   api_token: signinData.api_token,
+          // }), #change 2
+            body: JSON.stringify({
+            auth_token: signinData.auth_token,
+            site_id: signinData.site_id,
           }),
         },
       );
