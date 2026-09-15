@@ -128,14 +128,20 @@ export interface DiscoveryResponse {
 /**
  * Payload for /discovery endpoint
  */
+// interface DiscoveryRequest {
+//   username?: string;
+//   password?: string;
+//   api_token?: string;
+//   site_content_url: string;
+//   workbook_ids?: string[];
+//   include_twbx_parsing: boolean;
+// } #change 1
 interface DiscoveryRequest {
   username?: string;
   password?: string;
-  api_token?: string;
+  auth_token?: string;
+  site_id?: string;
   site_content_url: string;
-  workbook_ids?: string[];
-  include_twbx_parsing: boolean;
-}
 
 /**
  * Discovery API - Calls /discovery endpoint to get workbook metadata
@@ -145,8 +151,13 @@ interface DiscoveryRequest {
  * - Option B: Use username/password for direct auth
  */
 export async function getWorkbookDiscovery(
+  // params: {
+  //   apiToken?: string; #change 2
+  
+    //username?: string;
   params: {
-    apiToken?: string;
+    authToken?: string;
+    siteId?: string;
     username?: string;
     password?: string;
     workbookIds?: string[];
@@ -155,12 +166,17 @@ export async function getWorkbookDiscovery(
   signal?: AbortSignal,
 ): Promise<DiscoveryResponse> {
   // Validate auth method
-  if (!params.apiToken && (!params.username || !params.password)) {
-    throw new AnalysisApiError("Must provide either api_token or username+password");
+  // if (!params.apiToken && (!params.username || !params.password)) {
+  //   throw new AnalysisApiError("Must provide either api_token or username+password");
+  // } #change 3
+  if (!(params.authToken && params.siteId) && (!params.username || !params.password)) {
+    throw new AnalysisApiError("Must provide either auth_token+site_id or username+password");
   }
 
+  // const body: DiscoveryRequest = {
+  //   ...(params.apiToken && { api_token: params.apiToken }), #change 4
   const body: DiscoveryRequest = {
-    ...(params.apiToken && { api_token: params.apiToken }),
+    ...(params.authToken && params.siteId && { auth_token: params.authToken, site_id: params.siteId }),
     ...(params.username && { username: params.username }),
     ...(params.password && { password: params.password }),
     site_content_url: params.siteContentUrl || "",
