@@ -32,15 +32,21 @@ async function parseErrorDetail(response: Response): Promise<string> {
  * more LUIDs to scope the run to specific workbooks (single or multi).
  */
 export async function analyzeWorkbooks(
+  // params: {
+  //   apiToken: string; #change 1
   params: {
-    apiToken: string;
+    authToken: string;
+    siteId: string;
     workbookIds?: string[];
     siteContentUrl?: string;
   },
   signal?: AbortSignal,
 ): Promise<FullAnalysisResponse> {
+  // const body: AnalyzeRequest = {
+  //   api_token: params.apiToken, #change 2
   const body: AnalyzeRequest = {
-    api_token: params.apiToken,
+    auth_token: params.authToken,
+    site_id: params.siteId,
     site_content_url: params.siteContentUrl || "",
     workbook_ids: params.workbookIds && params.workbookIds.length > 0 ? params.workbookIds : undefined,
     include_twbx_parsing: true,
