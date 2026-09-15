@@ -781,7 +781,10 @@ const PreMigrationAnalysis = () => {
   const [showDiscoveryPopup, setShowDiscoveryPopup] = useState(false);
 
   const fetchDiscovery = async () => {
-    const token = sessionStorage.getItem("tableau_api_token");
+    // const token = sessionStorage.getItem("tableau_api_token");
+    // if (!token) { #change 1
+    const stored = sessionStorage.getItem("tableau_api_token");
+    const token = stored ? JSON.parse(stored) : null;
     if (!token) {
       toast({ title: "Session expired", description: "Please sign in again", variant: "destructive" });
       navigate("/");
@@ -792,8 +795,11 @@ const PreMigrationAnalysis = () => {
     try {
       const discoveryPromises =
         navState?.workbookIds?.map((workbookId) =>
+          // discoveryApi.getWorkbookDiscovery({
+          //   apiToken: token, #change 4
           discoveryApi.getWorkbookDiscovery({
-            apiToken: token,
+            authToken: token.auth_token,
+            siteId: token.site_id,
             workbookIds: [workbookId],
             siteContentUrl: "default",
           })
@@ -885,7 +891,10 @@ const PreMigrationAnalysis = () => {
   };
 
   const runAnalysis = async () => {
-    const token = sessionStorage.getItem("tableau_api_token");
+    // const token = sessionStorage.getItem("tableau_api_token");
+    // if (!token) { #change 2
+    const stored = sessionStorage.getItem("tableau_api_token");
+    const token = stored ? JSON.parse(stored) : null;
     if (!token) {
       toast({ title: "Session expired", description: "Please sign in again", variant: "destructive" });
       navigate("/");
@@ -896,8 +905,11 @@ const PreMigrationAnalysis = () => {
     setError(null);
 
     try {
+      // const response = await analysisApi.analyzeWorkbooks({
+      //   apiToken: token, #change 5
       const response = await analysisApi.analyzeWorkbooks({
-        apiToken: token,
+        authToken: token.auth_token,
+        siteId: token.site_id,
         workbookIds: navState?.workbookIds,
       });
       setResult(response);
@@ -1043,7 +1055,10 @@ const PreMigrationAnalysis = () => {
   // };
   const handleMigrateToPowerBI = async () => {
     if (!activeWorkbook) return;
-    const token = sessionStorage.getItem("tableau_api_token");
+    // const token = sessionStorage.getItem("tableau_api_token");
+    // if (!token) { #change migration
+    const stored = sessionStorage.getItem("tableau_api_token");
+    const token = stored ? JSON.parse(stored) : null;
     if (!token) {
       toast({ title: "Session expired", description: "Please sign in again", variant: "destructive" });
       navigate("/");
@@ -1055,8 +1070,12 @@ const PreMigrationAnalysis = () => {
       const dlRes = await fetch(`${TABLEAU_BACKEND_URL}/tableau/download_workbook`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        // body: JSON.stringify({
+        //   api_token: token,
+        //   workbook_id: activeWorkbook.workbook_metadata.id, #change 6
         body: JSON.stringify({
-          api_token: token,
+          auth_token: token.auth_token,
+          site_id: token.site_id,
           workbook_id: activeWorkbook.workbook_metadata.id,
           file_name: `${activeWorkbook.workbook_metadata.name}.twbx`,
         }),
