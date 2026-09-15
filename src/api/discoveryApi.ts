@@ -142,6 +142,7 @@ interface DiscoveryRequest {
   auth_token?: string;
   site_id?: string;
   site_content_url: string;
+}
 
 /**
  * Discovery API - Calls /discovery endpoint to get workbook metadata
