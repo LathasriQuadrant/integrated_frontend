@@ -14,11 +14,12 @@ const Login = () => {
   const [loginWindow, setLoginWindow] = useState<Window | null>(null);
 
   // Redirect if already authenticated
-  useEffect(() => {
-    if (isAuthenticated) {
-      navigate("/dashboard", { replace: true });
-    }
-  }, [isAuthenticated, navigate]);
+ useEffect(() => {
+  if (isAuthenticated) {
+    console.log("[Login] bounced to /dashboard");
+    navigate("/dashboard", { replace: true });
+  }
+}, [isAuthenticated, navigate]);
 
   // Check if auth completed via backend or localStorage (cross-tab)
   const checkAuthCompletion = useCallback(async () => {
