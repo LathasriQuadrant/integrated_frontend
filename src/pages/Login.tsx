@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Shield, Zap, Clock, ArrowLeft, ExternalLink, Loader2 } from "lucide-react";
@@ -12,6 +12,7 @@ const Login = () => {
   const { isAuthenticated, checkAuth } = useAuth();
   const [isWaiting, setIsWaiting] = useState(false);
   const [loginWindow, setLoginWindow] = useState<Window | null>(null);
+  const hasCompletedRef = useRef(false);
 
   // Redirect if already authenticated
  useEffect(() => {
@@ -22,7 +23,12 @@ const Login = () => {
 }, [isAuthenticated, navigate]);
 
   // Check if auth completed via backend or localStorage (cross-tab)
+  // const checkAuthCompletion = useCallback(async () => {
+  //   // First check localStorage (set by PowerBIAuthSuccess in the popup)
+  //   const localAuth = localStorage.getItem("powerbi_authenticated");
   const checkAuthCompletion = useCallback(async () => {
+    if (hasCompletedRef.current) return true; // already handled, ignore any late/duplicate call
+
     // First check localStorage (set by PowerBIAuthSuccess in the popup)
     const localAuth = localStorage.getItem("powerbi_authenticated");
     if (localAuth === "true") {
@@ -37,8 +43,8 @@ const Login = () => {
         sessionStorage.setItem("azure_user_tenant", tenant || "");
       }
       // Clean up localStorage flags
-      localStorage.removeItem("powerbi_authenticated");
-      localStorage.removeItem("user_details");
+      // localStorage.removeItem("powerbi_authenticated");
+      // localStorage.removeItem("user_details");
     //   await checkAuth();
     //   navigate("/dashboard", { replace: true });
     //   return true;
@@ -51,7 +57,17 @@ const Login = () => {
     //   return true;
     // }
     // return false;
-    await checkAuth();
+    // await checkAuth();
+    //   setIsWaiting(false);
+    //   setLoginWindow(null);
+    //   navigate("/dashboard", { replace: true });
+    //   return true;
+    // }
+            // Clean up localStorage flags
+      localStorage.removeItem("powerbi_authenticated");
+      localStorage.removeItem("user_details");
+      await checkAuth();
+      hasCompletedRef.current = true;
       setIsWaiting(false);
       setLoginWindow(null);
       navigate("/dashboard", { replace: true });
@@ -59,8 +75,19 @@ const Login = () => {
     }
 
     // Fallback: try backend session check
+  //   const isAuthed = await checkAuth();
+  //   if (isAuthed) {
+  //     setIsWaiting(false);
+  //     setLoginWindow(null);
+  //     navigate("/dashboard", { replace: true });
+  //     return true;
+  //   }
+  //   return false;
+  // }, [checkAuth, navigate]);
+        // Fallback: try backend session check
     const isAuthed = await checkAuth();
     if (isAuthed) {
+      hasCompletedRef.current = true;
       setIsWaiting(false);
       setLoginWindow(null);
       navigate("/dashboard", { replace: true });
@@ -104,6 +131,7 @@ const Login = () => {
       const isAuthed = await checkAuthCompletion();
       if (isAuthed) {
         loginWindow?.close();
+        setLoginWindow(null);
         clearInterval(interval);
       }
     }, 2000);
