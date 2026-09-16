@@ -39,7 +39,21 @@ const Login = () => {
       // Clean up localStorage flags
       localStorage.removeItem("powerbi_authenticated");
       localStorage.removeItem("user_details");
-      await checkAuth();
+    //   await checkAuth();
+    //   navigate("/dashboard", { replace: true });
+    //   return true;
+    // }
+
+    // // Fallback: try backend session check
+    // const isAuthed = await checkAuth();
+    // if (isAuthed) {
+    //   navigate("/dashboard", { replace: true });
+    //   return true;
+    // }
+    // return false;
+    await checkAuth();
+      setIsWaiting(false);
+      setLoginWindow(null);
       navigate("/dashboard", { replace: true });
       return true;
     }
@@ -47,6 +61,8 @@ const Login = () => {
     // Fallback: try backend session check
     const isAuthed = await checkAuth();
     if (isAuthed) {
+      setIsWaiting(false);
+      setLoginWindow(null);
       navigate("/dashboard", { replace: true });
       return true;
     }
@@ -70,11 +86,17 @@ const Login = () => {
 
     const interval = setInterval(async () => {
       if (loginWindow && loginWindow.closed) {
-        const isAuthed = await checkAuthCompletion();
-        if (!isAuthed) {
-          setIsWaiting(false);
-          setLoginWindow(null);
-        }
+        // const isAuthed = await checkAuthCompletion();
+        // if (!isAuthed) {
+        //   setIsWaiting(false);
+        //   setLoginWindow(null);
+        // }
+      const isAuthed = await checkAuthCompletion();
+      if (isAuthed) {
+        loginWindow?.close();
+        setLoginWindow(null);
+        clearInterval(interval);
+      }
         clearInterval(interval);
         return;
       }
