@@ -97,15 +97,6 @@ const Login = () => {
   }, [checkAuth, navigate]);
 
   // Listen for storage events from the popup tab
-  // useEffect(() => {
-  //   const handleStorageChange = (e: StorageEvent) => {
-  //     if (e.key === "powerbi_authenticated" && e.newValue === "true") {
-  //       checkAuthCompletion();
-  //     }
-  //   };
-  //   window.addEventListener("storage", handleStorageChange);
-  //   return () => window.removeEventListener("storage", handleStorageChange);
-  // }, [checkAuthCompletion]);
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === "powerbi_authenticated" && e.newValue === "true") {
@@ -113,11 +104,9 @@ const Login = () => {
       }
     };
     window.addEventListener("storage", handleStorageChange);
-    return () => {
-      window.removeEventListener("storage", handleStorageChange);
-      hasCompletedRef.current = true; // block any in-flight completion from acting after unmount
-    };
+    return () => window.removeEventListener("storage", handleStorageChange);
   }, [checkAuthCompletion]);
+
   // Poll for authentication completion when waiting
   useEffect(() => {
     if (!isWaiting) return;
@@ -148,10 +137,7 @@ const Login = () => {
     }, 2000);
 
     // return () => clearInterval(interval);
-        return () => {
-      clearInterval(interval);
-      hasCompletedRef.current = true; // block any in-flight completion from acting after unmount
-    };
+       return () => clearInterval(interval);
   }, [isWaiting, loginWindow, checkAuthCompletion]);
 
   const handleAzureSignIn = () => {
