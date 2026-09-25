@@ -2547,125 +2547,116 @@ export default function Migration() {
             <DialogTitle>Confirm Data Source Connection</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            Review the detected data source connection below — edit if anything looks wrong — then enter
-            credentials to continue.
+            Review and edit the data source connection details below, then enter credentials to continue.
           </p>
-
-          <div className="space-y-1">
-            <label className="text-sm font-medium">Deployment mode</label>
-            <Select value={migrationMode} onValueChange={(v) => setMigrationMode(v as "lakehouse" | "direct")}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="lakehouse">Via Lakehouse (recommended for Snowflake)</SelectItem>
-                <SelectItem value="direct">Direct connection (Azure SQL only, for now)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-sm font-medium">Source type</label>
-            <Select value={connSourceType} onValueChange={setConnSourceType}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="AzureSql">Azure SQL</SelectItem>
-                <SelectItem value="Snowflake">Snowflake</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {migrationMode === "lakehouse" ? (
-            <>
-              {/* ── Read-only detected connection summary ──
-                  Nothing to retype here — Lakehouse /migrate only ever
-                  consumes the password; server/account/database/username
-                  are shown for confirmation only, sourced from the
-                  workbook's own embedded connection metadata. */}
-              <div className="rounded-lg border bg-muted/40 p-3 space-y-1.5 text-sm">
-                {connSourceType === "Snowflake" ? (
-                  <>
-                    <div className="flex justify-between gap-4">
-                      <span className="text-muted-foreground">Account</span>
-                      <span className="font-medium font-mono">{connAccount || "—"}</span>
-                    </div>
-                    <div className="flex justify-between gap-4">
-                      <span className="text-muted-foreground">Server</span>
-                      <span className="font-medium font-mono truncate">{connServer || "—"}</span>
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex justify-between gap-4">
-                    <span className="text-muted-foreground">Server</span>
-                    <span className="font-medium font-mono truncate">{connServer || "—"}</span>
-                  </div>
-                )}
-                <div className="flex justify-between gap-4">
-                  <span className="text-muted-foreground">Database</span>
-                  <span className="font-medium font-mono">{connDatabase || "—"}</span>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <span className="text-muted-foreground">Username</span>
-                  <span className="font-medium font-mono">{connUsername || "—"}</span>
-                </div>
-              </div>
-
+      
+          <div className="space-y-4">
+            {/* Deployment Mode Selection */}
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Deployment Mode</label>
+              <Select value={migrationMode} onValueChange={(v) => setMigrationMode(v as "lakehouse" | "direct")}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="lakehouse">Via Lakehouse (recommended for Snowflake)</SelectItem>
+                  <SelectItem value="direct">Direct Connection (Azure SQL & Snowflake)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+      
+            {/* Dynamic Connection Details from Response */}
+            <div className="space-y-3 border rounded-lg p-4 bg-gray-50">
+              <div className="text-sm font-medium">Connection Details</div>
+      
+              {/* Datasource (from connectionType) */}
               <div className="space-y-1">
-                <label className="text-sm font-medium">
-                  {connSourceType} password for{" "}
-                  <span className="font-mono">{connUsername || "this user"}</span>
-                </label>
-                <p className="text-xs text-amber-700">
-                  Enter the {connSourceType} account password for the username above — not your Tableau
-                  or Windows login. This is what {connSourceType} itself will authenticate with.
-                </p>
-                <Input
-                  type="password"
-                  placeholder="Password"
-                  value={lakehousePassword}
-                  onChange={(e) => setLakehousePassword(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleConnectionDetailsSubmit();
-                  }}
-                />
+                <label className="text-xs font-medium text-muted-foreground">Datasource</label>
+                <div className="text-sm font-mono bg-white border rounded px-3 py-2">
+                  {connSourceType || "Unknown"}
+                </div>
               </div>
-            </>
-          ) : (
-            <>
-              {/* ── Direct mode: fully editable — these values are sent
-                  in the deploy payload's connectionParams ── */}
-              {connSourceType === "Snowflake" ? (
+      
+              {/* Render dynamic fields based on response */}
+              {/* For Snowflake: server, schema, warehouse, database */}
+              {connSourceType === "Snowflake" && (
                 <>
-                  <Input
-                    placeholder="Account"
-                    value={connAccount}
-                    onChange={(e) => setConnAccount(e.target.value)}
-                  />
-                  <Input
-                    placeholder="Warehouse"
-                    value={connWarehouse}
-                    onChange={(e) => setConnWarehouse(e.target.value)}
-                  />
-                  <Input
-                    placeholder="Database"
-                    value={connDatabase}
-                    onChange={(e) => setConnDatabase(e.target.value)}
-                  />
-                  <Input placeholder="Schema" value={connSchema} onChange={(e) => setConnSchema(e.target.value)} />
-                </>
-              ) : (
-                <>
-                  <Input placeholder="Server" value={connServer} onChange={(e) => setConnServer(e.target.value)} />
-                  <Input
-                    placeholder="Database"
-                    value={connDatabase}
-                    onChange={(e) => setConnDatabase(e.target.value)}
-                  />
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Server</label>
+                    <Input
+                      placeholder="Server"
+                      value={connServer}
+                      onChange={(e) => setConnServer(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Schema</label>
+                    <Input
+                      placeholder="Schema"
+                      value={connSchema}
+                      onChange={(e) => setConnSchema(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Warehouse</label>
+                    <Input
+                      placeholder="Warehouse"
+                      value={connWarehouse}
+                      onChange={(e) => setConnWarehouse(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Database</label>
+                    <Input
+                      placeholder="Database"
+                      value={connDatabase}
+                      onChange={(e) => setConnDatabase(e.target.value)}
+                    />
+                  </div>
                 </>
               )}
-              <Input placeholder="Username" value={connUsername} onChange={(e) => setConnUsername(e.target.value)} />
+      
+              {/* For Azure SQL: server, database */}
+              {connSourceType === "AzureSql" && (
+                <>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Server</label>
+                    <Input
+                      placeholder="Server"
+                      value={connServer}
+                      onChange={(e) => setConnServer(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Database</label>
+                    <Input
+                      placeholder="Database"
+                      value={connDatabase}
+                      onChange={(e) => setConnDatabase(e.target.value)}
+                    />
+                  </div>
+                </>
+              )}
+      
+              {/* Username (always at end, before password) */}
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Username</label>
+                <Input
+                  placeholder="Username"
+                  value={connUsername}
+                  onChange={(e) => setConnUsername(e.target.value)}
+                />
+              </div>
+            </div>
+      
+            {/* Password Input (always shown, empty for user to fill) */}
+            <div className="space-y-1">
+              <label className="text-sm font-medium">
+                Password for <span className="font-mono">{connUsername || "this user"}</span>
+              </label>
+              <p className="text-xs text-muted-foreground">
+                Enter the {connSourceType} account password for the username above.
+              </p>
               <Input
                 type="password"
                 placeholder="Password"
@@ -2675,16 +2666,15 @@ export default function Migration() {
                   if (e.key === "Enter") handleConnectionDetailsSubmit();
                 }}
               />
-            </>
-          )}
-
-          {migrationMode === "direct" && connSourceType === "Snowflake" && (
-            <p className="text-sm text-amber-600">
-              Direct Snowflake deployment isn't currently supported end-to-end — this will likely fail. Use "Via
-              Lakehouse" instead.
-            </p>
-          )}
-
+            </div>
+      
+            {migrationMode === "direct" && connSourceType === "Snowflake" && (
+              <p className="text-sm text-amber-600">
+                Direct Snowflake deployment is supported. Lakehouse is still recommended for better performance.
+              </p>
+            )}
+          </div>
+      
           <DialogFooter>
             <Button variant="outline" onClick={handleConnectionDetailsCancel}>
               Cancel
