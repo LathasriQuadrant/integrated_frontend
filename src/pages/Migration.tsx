@@ -2565,101 +2565,95 @@ export default function Migration() {
               </Select>
             </div>
       
-            {/* Connection Details - Dynamic based on extracted response */}
-            {migrationMode === "lakehouse" ? (
-              /* Lakehouse: Read-only display */
-              <div className="border rounded-lg p-3 bg-gray-50 space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Datasource:</span>
-                  <span className="font-medium">{connSourceType}</span>
+            {/* Connection Details - All Editable for Both Modes */}
+            <div className="space-y-2">
+              {/* Datasource (read-only) */}
+              <div className="text-xs font-medium text-muted-foreground">Datasource: {connSourceType}</div>
+      
+              {/* Snowflake Fields */}
+              {connSourceType === "Snowflake" && (
+                <>
+                  {connServer && (
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium">Server</label>
+                      <Input
+                        className="h-8 text-sm"
+                        value={connServer}
+                        onChange={(e) => setConnServer(e.target.value)}
+                      />
+                    </div>
+                  )}
+                  {connSchema && (
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium">Schema</label>
+                      <Input
+                        className="h-8 text-sm"
+                        value={connSchema}
+                        onChange={(e) => setConnSchema(e.target.value)}
+                      />
+                    </div>
+                  )}
+                  {connWarehouse && (
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium">Warehouse</label>
+                      <Input
+                        className="h-8 text-sm"
+                        value={connWarehouse}
+                        onChange={(e) => setConnWarehouse(e.target.value)}
+                      />
+                    </div>
+                  )}
+                  {connDatabase && (
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium">Database</label>
+                      <Input
+                        className="h-8 text-sm"
+                        value={connDatabase}
+                        onChange={(e) => setConnDatabase(e.target.value)}
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+      
+              {/* Azure SQL Fields */}
+              {connSourceType === "AzureSql" && (
+                <>
+                  {connServer && (
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium">Server</label>
+                      <Input
+                        className="h-8 text-sm"
+                        value={connServer}
+                        onChange={(e) => setConnServer(e.target.value)}
+                      />
+                    </div>
+                  )}
+                  {connDatabase && (
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium">Database</label>
+                      <Input
+                        className="h-8 text-sm"
+                        value={connDatabase}
+                        onChange={(e) => setConnDatabase(e.target.value)}
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+      
+              {/* Username (always at end) */}
+              {connUsername && (
+                <div className="space-y-1">
+                  <label className="text-xs font-medium">Username</label>
+                  <Input
+                    className="h-8 text-sm"
+                    value={connUsername}
+                    onChange={(e) => setConnUsername(e.target.value)}
+                  />
                 </div>
-                {connServer && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Server:</span>
-                    <span className="font-medium font-mono text-xs truncate">{connServer}</span>
-                  </div>
-                )}
-                {connSchema && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Schema:</span>
-                    <span className="font-medium">{connSchema}</span>
-                  </div>
-                )}
-                {connWarehouse && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Warehouse:</span>
-                    <span className="font-medium">{connWarehouse}</span>
-                  </div>
-                )}
-                {connDatabase && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Database:</span>
-                    <span className="font-medium">{connDatabase}</span>
-                  </div>
-                )}
-                {connUsername && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Username:</span>
-                    <span className="font-medium">{connUsername}</span>
-                  </div>
-                )}
-              </div>
-            ) : (
-              /* Direct: Editable fields */
-              <div className="space-y-2">
-                <div className="text-xs font-medium text-muted-foreground">Datasource: {connSourceType}</div>
-                {connServer && (
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium">Server</label>
-                    <Input
-                      className="h-8 text-sm"
-                      value={connServer}
-                      onChange={(e) => setConnServer(e.target.value)}
-                    />
-                  </div>
-                )}
-                {connSchema && (
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium">Schema</label>
-                    <Input
-                      className="h-8 text-sm"
-                      value={connSchema}
-                      onChange={(e) => setConnSchema(e.target.value)}
-                    />
-                  </div>
-                )}
-                {connWarehouse && (
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium">Warehouse</label>
-                    <Input
-                      className="h-8 text-sm"
-                      value={connWarehouse}
-                      onChange={(e) => setConnWarehouse(e.target.value)}
-                    />
-                  </div>
-                )}
-                {connDatabase && (
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium">Database</label>
-                    <Input
-                      className="h-8 text-sm"
-                      value={connDatabase}
-                      onChange={(e) => setConnDatabase(e.target.value)}
-                    />
-                  </div>
-                )}
-                {connUsername && (
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium">Username</label>
-                    <Input
-                      className="h-8 text-sm"
-                      value={connUsername}
-                      onChange={(e) => setConnUsername(e.target.value)}
-                    />
-                  </div>
-                )}
-              </div>
-            )}
+              )}
+            </div>
       
             {/* Password */}
             <div className="space-y-1">
@@ -2693,6 +2687,7 @@ export default function Migration() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
 
       {/* Reuse Semantic Model Dialog */}
       <Dialog
